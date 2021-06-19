@@ -2,337 +2,170 @@
 
 declare(strict_types=1);
 
-namespace JWage\PHPUnitTestGenerator;
+namespace PhpJit\ApidocTestsGenerator;
 
-use Doctrine\Inflector\Inflector;
-use JWage\PHPUnitTestGenerator\Configuration\Configuration;
-use PhpParser\Builder\Class_;
-use PhpParser\Builder\Method;
-use PhpParser\BuilderFactory;
-use PhpParser\Node;
+use ApiPlatform\Core\OpenApi\Model\Components;
+use ApiPlatform\Core\OpenApi\Model\PathItem;
+use ApiPlatform\Core\OpenApi\Serializer\OpenApiNormalizer;
+use ApiPlatform\Core\Serializer\ItemNormalizer;
+use Doctrine\ORM\EntityManagerInterface;
+use Faker\Generator as FakerGenerator;
+use PhpJit\ApidocTestsGenerator\Configuration\ComposerConfigurationReaderInterface;
+use PhpJit\ApidocTestsGenerator\TemplateClass\PostTemplateClassCollectionTest;
+use PhpJit\ApidocTestsGenerator\Traits\SwaggerTrait;
+use PhpParser\ParserFactory;
 use PhpParser\PrettyPrinter;
 use ReflectionClass;
-use function array_map;
-use function class_exists;
-use function implode;
-use function sprintf;
+use Symfony\Component\Serializer\NameConverter\CamelCaseToSnakeCaseNameConverter;
+use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 use function str_replace;
 
-class TestClassGenerator
+class TestClassGenerator implements TestClassGeneratorInterface
 {
-    /** @var Configuration */
-    private $configuration;
-
-    /** @var Inflector */
-    private $inflector;
-
-    /** @var BuilderFactory */
-    private $builderFactory;
-
-    /** @var ReflectionClass */
-    private $reflectionClass;
-
-    /** @var string */
-    private $classShortName;
-
-    /** @var string */
-    private $testNamespace;
-
-    /** @var string */
-    private $testClassShortName;
-
-    /** @var string */
-    private $testClassName;
-
-    public function __construct(
-        Configuration $configuration,
-        ?Inflector $inflector = null
-    ) {
-        $this->configuration  = $configuration;
-        $this->inflector      = $inflector ?? InflectorFactory::createEnglishInflector();
-        $this->builderFactory = new BuilderFactory();
-    }
-
-    public function generate(string $className) : GeneratedTestClass
-    {
-        $this->init($className);
-
-        $testClassMetadata = (new TestClassMetadataParser(
-            $this->inflector
-        ))->getTestClassMetadata($className);
-
-        $code = $this->generateTestClass($testClassMetadata);
-
-        $code = $this->replaceWithNewLines($code);
-
-        return new GeneratedTestClass(
-            $className,
-            $this->testClassName,
-            $code
-        );
-    }
-
-    private function replaceWithNewLines(string $code) : string
-    {
-        $code = str_replace('    private $__newLineReplace__;', '', $code);
-
-        $code = str_replace(<<<CODE
-    function __newLineReplace__()
-    {
-    }
-CODE
-        , '', $code);
-
-        return $code . "\n";
-    }
-
-    private function generateTestClass(TestClassMetadata $testClassMetadata) : string
-    {
-        $nodes = $this->generateTestClassNodes($testClassMetadata);
-
-        return (new PrettyPrinter\Standard())
-            ->prettyPrintFile($nodes);
-    }
+    public const  IDENTIFIER = 'TemplateClass';
+    public const PATH_TESTS = 'App\Test\Func';
+    public string $testNamespace;
+    public string $code;
+    private ReflectionClass $reflectionClass;
+    private ParserFactory $parserFactory;
+    private EntityManagerInterface $entityManager;
+    private FakerGenerator $fakerGenerator;
+    private ComposerConfigurationReaderInterface $composerConfigurationReader;
+    private ItemNormalizer $itemNormalizer;
+    private DenormalizerInterface $denormalizer;
+    private array $parser;
 
     /**
-     * @return Node[]
+     * TestClassGenerator constructor.
+     * @param ParserFactory $parserFactory
+     * @param EntityManagerInterface $entityManager
+     * @param FakerGenerator $fakerGenerator
+     * @param ComposerConfigurationReaderInterface $composerConfigurationReader
+     * @param ItemNormalizer $itemNormalizer
+     * @param DenormalizerInterface $denormalizer
      */
-    private function generateTestClassNodes(TestClassMetadata $testClassMetadata) : array
+    public function __construct(ParserFactory $parserFactory, EntityManagerInterface $entityManager, FakerGenerator $fakerGenerator, ComposerConfigurationReaderInterface $composerConfigurationReader, ItemNormalizer $itemNormalizer, DenormalizerInterface $denormalizer)
     {
-        $nodes = [];
-
-        $nodes[] = new Node\Stmt\Declare_([new Node\Stmt\DeclareDeclare('strict_types', $this->builderFactory->val(1))]);
-
-        $nodes[] = new Node\Stmt\Nop();
-
-        $namespaceBuilder = $this->builderFactory->namespace($this->testNamespace);
-
-        foreach ($testClassMetadata->getUseStatements() as $useStatement) {
-            $namespaceBuilder->addStmt($this->builderFactory->use($useStatement));
-        }
-
-        $namespaceBuilder->addStmt(new Node\Stmt\Nop());
-
-        $classBuilder = $this->builderFactory->class($this->testClassShortName)
-            ->extend('TestCase');
-
-        $this->generateTestClassProperties($testClassMetadata, $classBuilder);
-        $this->generateTestClassTestMethods($testClassMetadata, $classBuilder);
-        $this->generateTestClassSetUpMethod($testClassMetadata, $classBuilder);
-
-        $namespaceBuilder->addStmt($classBuilder);
-
-        $nodes[] = $namespaceBuilder->getNode();
-
-        return $nodes;
+        $this->parserFactory = $parserFactory;
+        $this->entityManager = $entityManager;
+        $this->fakerGenerator = $fakerGenerator;
+        $this->composerConfigurationReader = $composerConfigurationReader;
+        $this->itemNormalizer = $itemNormalizer;
+        $this->denormalizer = $denormalizer;
     }
 
-    private function generateTestClassProperties(
-        TestClassMetadata $testClassMetadata,
-        Class_ $classBuilder
-    ) : void {
-        foreach ($testClassMetadata->getProperties() as $property) {
-            $classBuilder->addStmt(
-                $this->builderFactory->property($property['propertyName'])
-                    ->makePrivate()
-                    ->setDocComment($this->generatePropertyDocBlock($property))
-            );
+    use SwaggerTrait;
 
-            $classBuilder->addStmt(
-                $this->builderFactory->property('__newLineReplace__')
-                    ->makePrivate()
-            );
-        }
-    }
 
-    /**
-     * @param string[] $property
-     */
-    private function generatePropertyDocBlock(array $property) : string
+    public function generate(array $templateOperation, string $route, PathItem $resource, Components $components): GeneratedTestClass
     {
-        $docBlockTypes = [$property['propertyType']];
+        $this->init($templateOperation['template'], $route);
+        if ($templateOperation['template'] == PostTemplateClassCollectionTest::class) {
 
-        if ($property['type'] === TestClassMetadataParser::DEPENDENCY) {
-            $docBlockTypes[] = 'MockObject';
-        }
-
-        return sprintf('/** @var %s */', implode('|', $docBlockTypes));
-    }
-
-    private function generateTestClassTestMethods(
-        TestClassMetadata $testClassMetadata,
-        Class_ $classBuilder
-    ) : void {
-        foreach ($testClassMetadata->getTestMethods() as $testMethod) {
-            $methodBuilder = $this->builderFactory->method($testMethod['methodName'])
-                ->makePublic()
-                ->setReturnType('void');
-
-            foreach ($testMethod['lines'] as $line) {
-                $this->generateTestClassMethodLine($methodBuilder, $line);
-            }
-
-            $classBuilder->addStmt($methodBuilder);
-
-            $classBuilder->addStmt($this->builderFactory->method('__newLineReplace__'));
-        }
-    }
-
-    /**
-     * @param mixed[] $line
-     */
-    private function generateTestClassMethodLine(Method $methodBuilder, array $line) : void
-    {
-        switch ($line['type']) {
-            case TestClassMetadataParser::DEPENDENCY:
-                $methodBuilder->addStmt(new Node\Expr\Assign(
-                    $this->builderFactory->var($line['variableName']),
-                    $this->createMockMethodCall($line['variableType'])
-                ));
-
-                break;
-
-            case TestClassMetadataParser::NORMAL:
-                $methodBuilder->addStmt(new Node\Expr\Assign(
-                    $this->builderFactory->var($line['variableName']),
-                    $this->builderFactory->val('')
-                ));
-
-                break;
-
-            case TestClassMetadataParser::SUT:
-                $arguments = $this->builderFactory->args(array_map(function (string $parameter) {
-                    return $this->builderFactory->var($parameter);
-                }, $line['arguments']));
-
-                $assertArguments = [];
-                $assertMethod    = 'assertNull';
-
-                switch ($line['methodReturnType']) {
-                    case 'null':
-                        $assertMethod = 'assertNull';
-                        break;
-
-                    case 'string':
-                        $assertMethod      = 'assertSame';
-                        $assertArguments[] = '';
-                        break;
-
-                    case 'int':
-                        $assertMethod      = 'assertSame';
-                        $assertArguments[] = 1;
-                        break;
-
-                    case 'float':
-                        $assertMethod      = 'assertSame';
-                        $assertArguments[] = 1.0;
-                        break;
-
-                    case 'bool':
-                        $assertMethod = 'assertTrue';
-                        break;
-
-                    case 'array':
-                        $assertMethod      = 'assertSame';
-                        $assertArguments[] = [];
-                        break;
-
-                    default:
-                        if (class_exists($line['methodReturnType'])) {
-                            $reflectionClass = new ReflectionClass($line['methodReturnType']);
-
-                            $assertMethod      = 'assertInstanceOf';
-                            $assertArguments[] = $this->builderFactory->classConstFetch(
-                                $reflectionClass->getShortName(),
-                                'class'
-                            );
-                        }
-                }
-
-                $assertArguments[] = $this->builderFactory->methodCall(
-                    $this->builderFactory->var('this->' . $line['variableName']),
-                    $line['methodName'],
-                    $arguments
-                );
-
-                $methodBuilder->addStmt(
-                    $this->builderFactory->staticCall(
-                        'self',
-                        $assertMethod,
-                        $assertArguments
-                    )
-                );
-
-                break;
-        }
-    }
-
-    private function generateTestClassSetUpMethod(
-        TestClassMetadata $testClassMetadata,
-        Class_ $classBuilder
-    ) : void {
-        $methodBuilder = $this->builderFactory->method('setUp')
-            ->makeProtected()
-            ->setReturnType('void');
-
-        foreach ($testClassMetadata->getSetUpDependencies() as $setUpDependency) {
-            switch ($setUpDependency['type']) {
-                case TestClassMetadataParser::DEPENDENCY:
-                    $methodBuilder->addStmt(new Node\Expr\Assign(
-                        $this->builderFactory->var('this->' . $setUpDependency['propertyName']),
-                        $this->createMockMethodCall($setUpDependency['propertyType'])
-                    ));
-
-                    break;
-
-                case TestClassMetadataParser::NORMAL:
-                    $methodBuilder->addStmt(new Node\Expr\Assign(
-                        $this->builderFactory->var('this->' . $setUpDependency['propertyName']),
-                        $this->builderFactory->val($setUpDependency['propertyValue'])
-                    ));
-
-                    break;
-
-                case TestClassMetadataParser::SUT:
-                    $arguments = array_map(function (string $argument) {
-                        return $this->builderFactory->var('this->' . $argument);
-                    }, $setUpDependency['arguments']);
-
-                    $methodBuilder->addStmt(new Node\Expr\Assign(
-                        $this->builderFactory->var('this->' . $setUpDependency['propertyName']),
-                        $this->builderFactory->new(
-                            new Node\Name($setUpDependency['propertyType']),
-                            $arguments
-                        )
-                    ));
-
-                    break;
+            $body = $this->getRequestBody($templateOperation, $components);
+            if ($body !== null) {
+                $this->code = str_replace('{body}', json_encode($body), $this->code);
             }
         }
 
-        $classBuilder->addStmt($methodBuilder);
+        if (preg_match('/class\s+(\w+)(.*)?\{/', $this->code, $matches)) {
+            $class = $matches[1];
+
+            $generated = new GeneratedTestClass(
+                $class,
+                $this->testNamespace . '\\' . $class,
+                $this->code
+            );
+
+            return $generated;
+        }
     }
 
-    private function createMockMethodCall(string $className) : Node\Expr\MethodCall
+    public function toSnakeCase(string $name): string
     {
-        return $this->builderFactory->methodCall(
-            $this->builderFactory->var('this'),
-            'createMock',
-            [$this->builderFactory->classConstFetch($className, 'class')]
-        );
+        return (new CamelCaseToSnakeCaseNameConverter())->normalize($name);
     }
 
-    private function init(string $className) : void
+    public function toCamelCase(string $name, $separator= '\\'): string
+    {
+        $array = explode($separator, $name);
+        $array2 = [];
+        foreach ($array as $item) {
+            $array2[] = (new CamelCaseToSnakeCaseNameConverter(null,false))->denormalize($item);
+        }
+        return implode($separator,$array2);
+    }
+
+    private function replaceIdentifiers(string $code, string $route): string
+    {
+        $arrayRoute = $this->toCamelCase($route, '/');
+        $testNamespace = str_replace('/', '',$arrayRoute);
+        $code = str_replace(self::IDENTIFIER, $this->toCamelCase($testNamespace), $code);
+
+        return str_replace($this->toSnakeCase(self::IDENTIFIER), $testNamespace, $code);
+    }
+
+    private function replaceRoute(string $route, string $code): void
+    {
+        $this->code = str_replace('{route}', $route, $code);
+    }
+
+    private function replaceNamespace(string $route):void
+    {
+        $arrayRoute = str_replace('/','\\', $route);
+
+        $this->testNamespace = self::PATH_TESTS . $this->toCamelCase($arrayRoute);
+
+        if ($this->checkNamespace($this->testNamespace)) {
+            $this->code = str_replace($this->reflectionClass->getNamespaceName(), $this->testNamespace, $this->code);
+        }
+
+    }
+
+    private function checkNamespace(string $testNamespace): bool
+    {
+        if (preg_match(
+            '/^[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff\\\\]*[a-zA-Z0-9_\x7f-\xff]$/',
+            $testNamespace
+        )) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function cleanRoute(string $route): string
+    {
+        return str_replace(['{','}'], "", $route);
+    }
+
+    private function init(string $className, string $route, int $preferPhp = ParserFactory::PREFER_PHP7): void
     {
         $this->reflectionClass = new ReflectionClass($className);
+        $this->code  = $this->getClassContets();
 
-        $this->classShortName     = $this->reflectionClass->getShortName();
-        $this->testNamespace      = str_replace(
-            $this->configuration->getSourceNamespace(),
-            $this->configuration->getTestsNamespace(),
-            $this->reflectionClass->getNamespaceName()
-        );
-        $this->testClassShortName = $this->classShortName . 'Test';
-        $this->testClassName      = $this->testNamespace . '\\' . $this->testClassShortName;
+        if ($this->reflectionClass->implementsInterface(TptClassTestInterface::class)) {
+
+            $this->replaceRoute($route, $this->code);
+
+            $templateRoute = $this->cleanRoute($route);
+            $this->replaceNamespace($templateRoute);
+
+            $this->code = $this->replaceIdentifiers($this->code, $templateRoute);
+
+            try {
+                $parser = $this->parserFactory->create($preferPhp);
+                $this->parser = $parser->parse($this->code);
+
+            } catch (\ParseError $error) {
+                echo "Parse error: {$error->getMessage()}\n";
+                return;
+            }
+        }
+    }
+
+    private function getClassContets(): string
+    {
+        return file_get_contents($this->reflectionClass->getFileName());
     }
 }

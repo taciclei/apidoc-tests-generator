@@ -2,107 +2,189 @@
 
 declare(strict_types=1);
 
-namespace JWage\PHPUnitTestGenerator\Command;
+namespace PhpJit\ApidocTestsGenerator\Command;
 
+use ApiPlatform\Core\OpenApi\Factory\OpenApiFactoryInterface;
+use ApiPlatform\Core\OpenApi\Model\PathItem;
+use Doctrine\ORM\EntityManagerInterface;
 use InvalidArgumentException;
-use JWage\PHPUnitTestGenerator\Configuration\AutoloadingStrategy;
-use JWage\PHPUnitTestGenerator\Configuration\ComposerConfigurationReader;
-use JWage\PHPUnitTestGenerator\Configuration\Configuration;
-use JWage\PHPUnitTestGenerator\TestClassGenerator;
-use JWage\PHPUnitTestGenerator\Writer\Psr4TestClassWriter;
-use JWage\PHPUnitTestGenerator\Writer\TestClassWriter;
+use PhpJit\ApidocTestsGenerator\Configuration\AutoloadingStrategy;
+use PhpJit\ApidocTestsGenerator\Configuration\ComposerConfigurationReaderInterface;
+use PhpJit\ApidocTestsGenerator\Configuration\Configuration;
+use PhpJit\ApidocTestsGenerator\TemplateClass\DeleteTemplateClassItemTest;
+use PhpJit\ApidocTestsGenerator\TemplateClass\GetTemplateClassCollectionTest;
+use PhpJit\ApidocTestsGenerator\TemplateClass\GetTemplateClassItemTest;
+use PhpJit\ApidocTestsGenerator\TemplateClass\PostTemplateClassCollectionTest;
+use PhpJit\ApidocTestsGenerator\TemplateClass\PutTemplateClassItemTest;
+use PhpJit\ApidocTestsGenerator\TestClassGeneratorInterface;
+use PhpJit\ApidocTestsGenerator\Traits\SwaggerTrait;
+use PhpJit\ApidocTestsGenerator\Writer\Psr4TestClassWriterInterface;
+use PhpJit\ApidocTestsGenerator\Writer\TestClassWriterInterface;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use function array_diff;
-use function array_values;
-use function assert;
-use function file_exists;
-use function get_declared_classes;
-use function getcwd;
-use function is_string;
+use Symfony\Component\Serializer\Normalizer\NormalizerInterface;
 use function sprintf;
 
-class GenerateTestClassCommand extends Command
+class GenerateTestClassCommand extends Command implements GenerateTestClassCommandInterface
 {
-    protected function configure() : void
+    use SwaggerTrait;
+    protected static $defaultName = 'generate-test-class';
+
+    private OpenApiFactoryInterface $openApiFactory;
+    private NormalizerInterface $normalizer;
+    private EntityManagerInterface $entityManager;
+    private ComposerConfigurationReaderInterface $composerConfigurationReader;
+    private TestClassGeneratorInterface $testClassGenerator;
+    /**
+     * @return OpenApiFactoryInterface
+     */
+    public function getOpenApiFactory(): OpenApiFactoryInterface
+    {
+        return $this->openApiFactory;
+    }
+
+    /**
+     * @return NormalizerInterface
+     */
+    public function getNormalizer(): NormalizerInterface
+    {
+        return $this->normalizer;
+    }
+
+    public function __construct(OpenApiFactoryInterface $openApiFactory,
+                                NormalizerInterface $normalizer,
+                                ComposerConfigurationReaderInterface $composerConfigurationReader,
+                                TestClassGeneratorInterface $testClassGenerator)
+    {
+        parent::__construct();
+        $this->openApiFactory = $openApiFactory;
+        $this->normalizer = $normalizer;
+        $this->composerConfigurationReader = $composerConfigurationReader;
+        $this->testClassGenerator = $testClassGenerator;
+    }
+
+    protected function configure(): void
     {
         $this
             ->setName('generate-test-class')
-            ->setDescription('Generate a PHPUnit test class from a class.')
-            ->addArgument('class', InputArgument::OPTIONAL, 'The class name to generate the test for.');
+            ->setDescription('Generate a PHPUnit test class from a class.');
     }
 
-    protected function execute(InputInterface $input, OutputInterface $output) : void
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $className = $input->getArgument('class');
+        /* @var $resources PathItem[] */
+        $resources = $this->getOpenApiFactory()->__invoke()->getPaths()->getPaths();
+        $components = $this->getOpenApiFactory()->__invoke()->getComponents();
 
-        if ($className === null || $className === '') {
-            throw new InvalidArgumentException('Specify class name to generate a unit test for.');
-        }
+        foreach ($resources as $route => $resource) {
+            $templatesOperation = $this->getTemplatesOperation($resource);
 
-        assert(is_string($className));
+            foreach ($templatesOperation as $templateOperation) {
+                $configuration = $this->composerConfigurationReader->createConfiguration();
+                $output->writeln(sprintf('Generating test class for <info>%s</info>', $templateOperation['template']));
+                $output->writeln('');
 
-        $className = $this->getClassName($className);
+                $generatedTestClass = $this->testClassGenerator->generate($templateOperation, $route, $resource, $components);
 
-        $output->writeln(sprintf('Generating test class for <info>%s</info>', $className));
-        $output->writeln('');
+                $output->writeln($generatedTestClass->getCode());
+                $testClassWriter = $this->createTestClassWriter($configuration);
 
-        $configuration = $this->createConfiguration();
+                $writePath = $testClassWriter->write($generatedTestClass);
 
-        $generateTestClass = $this->createTestClassGenerator($configuration);
-
-        $generatedTestClass = $generateTestClass->generate($className);
-
-        $output->writeln($generatedTestClass->getCode());
-
-        $writePath = $this->createTestClassWriter($configuration)
-            ->write($generatedTestClass);
-
-        $output->writeln(sprintf('Test class written to <info>%s</info>', $writePath));
-    }
-
-    private function getClassName(string $className) : string
-    {
-        // path to class was given
-        $filePath = getcwd() . '/' . $className;
-
-        if (file_exists($filePath)) {
-            $beforeClasses = get_declared_classes();
-
-            require_once $filePath;
-
-            $afterClasses = get_declared_classes();
-
-            $newClasses = array_reverse(array_values(array_diff($afterClasses, $beforeClasses)));
-
-            if (! isset($newClasses[0])) {
-                throw new InvalidArgumentException(sprintf('Could not find class in file %s', $filePath));
+                $output->writeln(sprintf('Test class written to <info>%s</info>', $writePath));
             }
 
-            $className = $newClasses[0];
         }
-
-        return $className;
+        return 0;
     }
 
-    private function createConfiguration() : Configuration
+    private function getTemplatesOperation(PathItem $resource): array
     {
-        return (new ComposerConfigurationReader())->createConfiguration();
+        $key = 0;
+        $temmplates = [];
+        if ($operation = $this->isGetItem($resource)) {
+            $key++;
+            $temmplates[$key]['template'] = GetTemplateClassItemTest::class;
+            $temmplates[$key]['operation'] = $operation;
+        }
+        if ($operation = $this->isGetCollection($resource)) {
+            $key++;
+            $temmplates[$key]['template'] = GetTemplateClassCollectionTest::class;
+            $temmplates[$key]['operation'] = $operation;
+        }
+        if ($operation = $this->isPost($resource)) {
+            $key++;
+            $temmplates[$key]['template'] = PostTemplateClassCollectionTest::class;
+            $temmplates[$key]['operation'] = $operation;
+        }
+        if ($operation = $this->isDelete($resource)) {
+            $key++;
+            $temmplates[$key]['template'] = DeleteTemplateClassItemTest::class;
+            $temmplates[$key]['operation'] = $operation;
+        }
+        if ($operation = $this->isPut($resource)) {
+            $key++;
+            $temmplates[$key]['template'] = PutTemplateClassItemTest::class;
+            $temmplates[$key]['operation'] = $operation;
+        }
+        if (isset($temmplates)) {
+            return $temmplates;
+        }
     }
 
-    private function createTestClassGenerator(Configuration $configuration) : TestClassGenerator
+    private function isPut(PathItem $operationId)
     {
-        return new TestClassGenerator($configuration);
+        if (method_exists($operationId, 'getPut') && $operationId->getPut() !== null && method_exists($operationId->getPut(), 'getoperationId')) {
+            if(!empty(preg_match('/put(.*)Item/', $operationId->getPut()->getoperationId()))){
+                return $operationId->getPut();
+            }
+        }
     }
 
-    private function createTestClassWriter(Configuration $configuration) : TestClassWriter
+    private function isDelete(PathItem $operationId)
+    {
+        if (method_exists($operationId, 'getDelete') && $operationId->getDelete() !== null && method_exists($operationId->getDelete(), 'getoperationId')) {
+            if(!empty(preg_match('/delete(.*)Item/', $operationId->getDelete()->getoperationId()))){
+                return $operationId->getDelete();
+            }
+        }
+    }
+// todo refacto
+    private function isPost(PathItem $operationId)
+    {
+        if (method_exists($operationId, 'getPost') && $operationId->getPost() !== null && method_exists($operationId->getPost(), 'getoperationId')) {
+            if(!empty(preg_match('/post(.*)Collection/', $operationId->getPost()->getoperationId()))) {
+                return $operationId->getPost();
+            }
+        }
+    }
+
+    private function isGetItem(PathItem $operationId)
+    {
+        if (method_exists($operationId, 'getGet') && $operationId->getGet() !== null && method_exists($operationId->getGet(), 'getoperationId')) {
+            if(!empty(preg_match('/get(.*)Item/', $operationId->getGet()->getoperationId()))){
+                return $operationId->getGet();
+            }
+        }
+    }
+
+    private function isGetCollection(PathItem $operationId)
+    {
+        if (method_exists($operationId, 'getGet') && $operationId->getGet() !== null && method_exists($operationId->getGet(), 'getoperationId')) {
+            if(!empty(preg_match('/get(.*)Collection/', $operationId->getGet()->getoperationId()))){
+                return $operationId->getGet();
+            }
+        }
+    }
+
+
+    private function createTestClassWriter(Configuration $configuration): TestClassWriterInterface
     {
         $autoloadingStrategy = $configuration->getAutoloadingStrategy();
 
         if ($autoloadingStrategy === AutoloadingStrategy::PSR4) {
-            return new Psr4TestClassWriter($configuration);
+            return new Psr4TestClassWriterInterface($configuration);
         }
 
         throw new InvalidArgumentException(

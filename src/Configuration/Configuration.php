@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace JWage\PHPUnitTestGenerator\Configuration;
+namespace PhpJit\ApidocTestsGenerator\Configuration;
 
 class Configuration
 {
