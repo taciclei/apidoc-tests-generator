@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace JWage\PHPUnitTestGenerator\Writer;
+namespace PhpJit\ApidocTestsGenerator\Writer;
 
-use JWage\PHPUnitTestGenerator\Configuration\Configuration;
-use JWage\PHPUnitTestGenerator\GeneratedTestClass;
+use PhpJit\ApidocTestsGenerator\Configuration\Configuration;
+use PhpJit\ApidocTestsGenerator\GeneratedTestClass;
 use RuntimeException;
 use Symfony\Component\Filesystem\Filesystem;
 use const DIRECTORY_SEPARATOR;
@@ -13,7 +13,7 @@ use function dirname;
 use function sprintf;
 use function str_replace;
 
-class Psr4TestClassWriter implements TestClassWriter
+class Psr4TestClassWriterInterface implements TestClassWriterInterface
 {
     /** @var Configuration */
     private $configuration;
@@ -29,6 +29,7 @@ class Psr4TestClassWriter implements TestClassWriter
 
     public function write(GeneratedTestClass $generatedTestClass) : string
     {
+
         $writePath = $this->generatePsr4TestWritePath($generatedTestClass);
 
         $writeDirectory = dirname($writePath);
@@ -51,14 +52,17 @@ class Psr4TestClassWriter implements TestClassWriter
 
     private function generatePsr4TestWritePath(GeneratedTestClass $generatedTestClass) : string
     {
+
         $writePath = $this->configuration->getTestsDir();
+
+        $testNamespace = explode('\\', $generatedTestClass->getTestClassName());
+        array_shift($testNamespace);
 
         $writePath .= '/' . str_replace(
             $this->configuration->getTestsNamespace() . '\\',
             '',
-            $generatedTestClass->getTestClassName()
+            implode('/',$testNamespace)
         ) . '.php';
-
         $writePath = str_replace('\\', DIRECTORY_SEPARATOR, $writePath);
 
         return $writePath;
