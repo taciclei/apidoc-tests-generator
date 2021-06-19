@@ -1,0 +1,48 @@
+{
+    "name": "jwage/phpunit-test-generator",
+    "description": "Generate PHPUnit test classes for a PHP class.",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Jonathan H. Wage",
+            "email": "jonwage@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^7.1",
+        "doctrine/inflector": "2.0.x-dev",
+        "nikic/php-parser": "^4.1",
+        "symfony/console": "^4.1",
+        "symfony/filesystem": "^4.2"
+    },
+    "require-dev": {
+        "doctrine/coding-standard": "^5.0",
+        "phpstan/phpstan": "^0.10",
+        "phpstan/phpstan-deprecation-rules": "^0.10",
+        "phpstan/phpstan-phpunit": "^0.10",
+        "phpstan/phpstan-strict-rules": "^0.10",
+        "phpunit/phpunit": "^7.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "JWage\\PHPUnitTestGenerator\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "JWage\\PHPUnitTestGenerator\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0.x-dev"
+        }
+    },
+    "bin": [
+        "bin/generate-unit-test"
+    ]
+}
