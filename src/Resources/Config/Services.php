@@ -12,7 +12,7 @@ return function(ContainerConfigurator $configurator) {
         ->autoconfigure() // Automatically registers your services as commands, event subscribers, etc
     ;
     $services->load('PhpJit\\ApidocTestsGenerator\\', '../../../src/*')
-        ->exclude('../../../src/{DependencyInjection,Entity,Tests}');
+        ->exclude('../../../src/{Resources,DependencyInjection,Entity,Tests}');
 
     $services->set(ItemNormalizer::class)->autowire()->autoconfigure()->public();
     $services->set(ParserFactory::class)->autowire()->autoconfigure()->public();
