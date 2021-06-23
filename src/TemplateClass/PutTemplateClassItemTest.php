@@ -18,8 +18,10 @@ class PutTemplateClassItemTest extends ApiTestCase implements TptClassTestInterf
 
     protected function setUp(): void
     {
+        parent::setUp();
+        $this->token = self::getToken();
         $this->markTestSkipped();
-        $this->client = static::createClient();
+        $this->client = self::getClient($this->token);
         $router = static::$container->get('api_platform.router');
         if (!$router instanceof Router) {
             throw new \RuntimeException('api_platform.router service not found.');

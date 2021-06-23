@@ -29,7 +29,9 @@ class PostTemplateClassCollectionTest extends ApiTestCase implements TptClassTes
 
     protected function setUp(): void
     {
-        $this->client = static::getClient();
+        parent::setUp();
+        $this->token = self::getToken();
+        $this->client = self::getClient($this->token);
         $router = static::$container->get('api_platform.router');
         if (!$router instanceof Router) {
             throw new \RuntimeException('api_platform.router service not found.');

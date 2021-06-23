@@ -18,6 +18,8 @@ class DeleteTemplateClassItemTest extends ApiTestCase implements TptClassTestInt
 
     protected function setUp(): void
     {
+        parent::setUp();
+        $this->token = self::getToken();
         $this->markTestSkipped();
         $this->client = static::createClient();
         $router = static::$container->get('api_platform.router');
@@ -33,7 +35,7 @@ class DeleteTemplateClassItemTest extends ApiTestCase implements TptClassTestInt
     public function testDeleteTemplateClassItem(): void
     {
         $this->markTestSkipped();
-        $client = static::createClient();
+        $client = self::getClient($this->token);
         $iri = (string) $this->findIriBy(Entity::class, ['id' => '1']);
         $client->request('DELETE', $iri);
 
