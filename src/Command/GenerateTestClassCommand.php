@@ -5,17 +5,13 @@ declare(strict_types=1);
 namespace PhpJit\ApidocTestsGenerator\Command;
 
 use ApiPlatform\Core\OpenApi\Factory\OpenApiFactoryInterface;
+use ApiPlatform\Core\OpenApi\Model\Operation;
 use ApiPlatform\Core\OpenApi\Model\PathItem;
 use Doctrine\ORM\EntityManagerInterface;
 use InvalidArgumentException;
 use PhpJit\ApidocTestsGenerator\Configuration\AutoloadingStrategy;
 use PhpJit\ApidocTestsGenerator\Configuration\ComposerConfigurationReaderInterface;
 use PhpJit\ApidocTestsGenerator\Configuration\Configuration;
-use PhpJit\ApidocTestsGenerator\TemplateClass\DeleteTemplateClassItemTest;
-use PhpJit\ApidocTestsGenerator\TemplateClass\GetTemplateClassCollectionTest;
-use PhpJit\ApidocTestsGenerator\TemplateClass\GetTemplateClassItemTest;
-use PhpJit\ApidocTestsGenerator\TemplateClass\PostTemplateClassCollectionTest;
-use PhpJit\ApidocTestsGenerator\TemplateClass\PutTemplateClassItemTest;
 use PhpJit\ApidocTestsGenerator\TestClassGeneratorInterface;
 use PhpJit\ApidocTestsGenerator\Traits\SwaggerTrait;
 use PhpJit\ApidocTestsGenerator\Writer\Psr4TestClassWriterInterface;
@@ -29,13 +25,16 @@ use function sprintf;
 class GenerateTestClassCommand extends Command implements GenerateTestClassCommandInterface
 {
     use SwaggerTrait;
-    protected static $defaultName = 'generate-test-class';
+
+    protected static $defaultName = 'apidoc_tests:generate-classes';
 
     private OpenApiFactoryInterface $openApiFactory;
     private NormalizerInterface $normalizer;
     private EntityManagerInterface $entityManager;
     private ComposerConfigurationReaderInterface $composerConfigurationReader;
     private TestClassGeneratorInterface $testClassGenerator;
+    private array $apiDocTemplates;
+
     /**
      * @return OpenApiFactoryInterface
      */
@@ -52,22 +51,25 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         return $this->normalizer;
     }
 
-    public function __construct(OpenApiFactoryInterface $openApiFactory,
-                                NormalizerInterface $normalizer,
-                                ComposerConfigurationReaderInterface $composerConfigurationReader,
-                                TestClassGeneratorInterface $testClassGenerator)
+    public function __construct(
+        OpenApiFactoryInterface $openApiFactory,
+        NormalizerInterface $normalizer,
+        ComposerConfigurationReaderInterface $composerConfigurationReader,
+        TestClassGeneratorInterface $testClassGenerator,
+        array $apiDocTemplates
+    )
     {
         parent::__construct();
         $this->openApiFactory = $openApiFactory;
         $this->normalizer = $normalizer;
         $this->composerConfigurationReader = $composerConfigurationReader;
         $this->testClassGenerator = $testClassGenerator;
+        $this->apiDocTemplates = $apiDocTemplates;
     }
 
     protected function configure(): void
     {
         $this
-            ->setName('generate-test-class')
             ->setDescription('Generate a PHPUnit test class from a class.');
     }
 
@@ -96,88 +98,91 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
             }
 
         }
+
         return 0;
     }
 
     private function getTemplatesOperation(PathItem $resource): array
     {
         $key = 0;
-        $temmplates = [];
+        $templates = [];
+
         if ($operation = $this->isGetItem($resource)) {
             $key++;
-            $temmplates[$key]['template'] = GetTemplateClassItemTest::class;
-            $temmplates[$key]['operation'] = $operation;
-        }
-        if ($operation = $this->isGetCollection($resource)) {
+            $templates[$key]['template'] = $this->apiDocTemplates['get'];
+        } elseif ($operation = $this->isGetCollection($resource)) {
             $key++;
-            $temmplates[$key]['template'] = GetTemplateClassCollectionTest::class;
-            $temmplates[$key]['operation'] = $operation;
-        }
-        if ($operation = $this->isPost($resource)) {
+            $templates[$key]['template'] = $this->apiDocTemplates['get_collection'];
+        } elseif ($operation = $this->isPost($resource)) {
             $key++;
-            $temmplates[$key]['template'] = PostTemplateClassCollectionTest::class;
-            $temmplates[$key]['operation'] = $operation;
-        }
-        if ($operation = $this->isDelete($resource)) {
+            $templates[$key]['template'] = $this->apiDocTemplates['post'];
+        } elseif ($operation = $this->isDelete($resource)) {
             $key++;
-            $temmplates[$key]['template'] = DeleteTemplateClassItemTest::class;
-            $temmplates[$key]['operation'] = $operation;
-        }
-        if ($operation = $this->isPut($resource)) {
+            $templates[$key]['template'] = $this->apiDocTemplates['delete'];
+        } elseif ($operation = $this->isPut($resource)) {
             $key++;
-            $temmplates[$key]['template'] = PutTemplateClassItemTest::class;
-            $temmplates[$key]['operation'] = $operation;
+            $templates[$key]['template'] = $this->apiDocTemplates['put'];
         }
-        if (isset($temmplates)) {
-            return $temmplates;
+
+        if ($operation !== null && !empty($templates[$key]['template'])) {
+            $templates[$key]['operation'] = $operation;
         }
+
+        return $templates;
     }
 
-    private function isPut(PathItem $operationId)
+    private function isMethodExists(PathItem $operationId, string $verb, string $type = 'Item'): ?Operation
     {
-        if (method_exists($operationId, 'getPut') && $operationId->getPut() !== null && method_exists($operationId->getPut(), 'getoperationId')) {
-            if(!empty(preg_match('/put(.*)Item/', $operationId->getPut()->getoperationId()))){
-                return $operationId->getPut();
-            }
+        $verb = ucfirst(strtolower($verb));
+        $type = ucfirst(strtolower($type));
+
+        $method = sprintf('get%s', $verb);
+
+        if (method_exists($operationId, $method) === false) {
+            return null;
         }
+
+        if ($operationId->{$method}() === null) {
+            return null;
+        }
+
+        if (method_exists($operationId->{$method}(), 'getoperationId') === false) {
+            return null;
+        }
+
+        $regex = sprintf('/%s(.*)%s/', strtolower($verb), $type);
+
+        if (empty(preg_match($regex, $operationId->{$method}()->getoperationId()))) {
+            return null;
+        }
+
+        return $operationId->{$method}();
     }
 
-    private function isDelete(PathItem $operationId)
+    private function isPut(PathItem $operationId): ?Operation
     {
-        if (method_exists($operationId, 'getDelete') && $operationId->getDelete() !== null && method_exists($operationId->getDelete(), 'getoperationId')) {
-            if(!empty(preg_match('/delete(.*)Item/', $operationId->getDelete()->getoperationId()))){
-                return $operationId->getDelete();
-            }
-        }
-    }
-// todo refacto
-    private function isPost(PathItem $operationId)
-    {
-        if (method_exists($operationId, 'getPost') && $operationId->getPost() !== null && method_exists($operationId->getPost(), 'getoperationId')) {
-            if(!empty(preg_match('/post(.*)Collection/', $operationId->getPost()->getoperationId()))) {
-                return $operationId->getPost();
-            }
-        }
+        return $this->isMethodExists($operationId, 'put');
     }
 
-    private function isGetItem(PathItem $operationId)
+    private function isDelete(PathItem $operationId): ?Operation
     {
-        if (method_exists($operationId, 'getGet') && $operationId->getGet() !== null && method_exists($operationId->getGet(), 'getoperationId')) {
-            if(!empty(preg_match('/get(.*)Item/', $operationId->getGet()->getoperationId()))){
-                return $operationId->getGet();
-            }
-        }
+        return $this->isMethodExists($operationId, 'delete');
     }
 
-    private function isGetCollection(PathItem $operationId)
+    private function isPost(PathItem $operationId): ?Operation
     {
-        if (method_exists($operationId, 'getGet') && $operationId->getGet() !== null && method_exists($operationId->getGet(), 'getoperationId')) {
-            if(!empty(preg_match('/get(.*)Collection/', $operationId->getGet()->getoperationId()))){
-                return $operationId->getGet();
-            }
-        }
+        return $this->isMethodExists($operationId, 'post', 'Collection');
     }
 
+    private function isGetItem(PathItem $operationId): ?Operation
+    {
+        return $this->isMethodExists($operationId, 'get');
+    }
+
+    private function isGetCollection(PathItem $operationId): ?Operation
+    {
+        return $this->isMethodExists($operationId, 'get', 'Collection');
+    }
 
     private function createTestClassWriter(Configuration $configuration): TestClassWriterInterface
     {
