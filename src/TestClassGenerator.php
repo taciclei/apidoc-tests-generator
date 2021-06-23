@@ -46,7 +46,7 @@ class TestClassGenerator implements TestClassGeneratorInterface
 
         $this->init($templateOperation['template'], $route, $tag);
 
-        if ($templateOperation['method'] === 'post') {
+        if ($templateOperation['method'] === 'post' || $templateOperation['method'] === 'put') {
 
             $body = $this->getRequestBody($templateOperation, $components);
 
