@@ -15,13 +15,22 @@ class ApidocTestsGeneratorExtension extends Extension
     {
         $loader = new PhpFileLoader($container, new FileLocator(__DIR__ . '/../Resources/Config'));
         $loader->load('Services.php');
-        //dd($loader);
 
-/*        $loader = new XmlFileLoader(
-            $container,
-            new FileLocator(
-                __DIR__.'/../Resources/Config')
-        );
-        $loader->load('services.xml');*/
+        $config = $this->processConfiguration(new Configuration(), $configs);
+        $this->setParameters($config, 'apidoc_tests_generator', $container);
+
     }
+
+    private function setParameters(array $parameters, string $base, ContainerBuilder $container): void
+    {
+        foreach ($parameters as $key => $value) {
+            $namespace = $base . '.' . $key;
+            $container->setParameter($namespace, $value);
+
+            if (\is_array($value)) {
+                $this->setParameters($value, $namespace, $container);
+            }
+        }
+    }
+
 }
