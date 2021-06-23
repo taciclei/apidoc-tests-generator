@@ -68,7 +68,7 @@ class TestClassGenerator implements TestClassGeneratorInterface
             }
         }
 
-        if (preg_match('/class\s+(\w+)(.*)?\{/', $this->code, $matches)) {
+        if (preg_match('/class\s+(\w+)(.*\r*\n*)?\{/', $this->code, $matches)) {
             $class = $matches[1];
 
             $generated = new GeneratedTestClass(
