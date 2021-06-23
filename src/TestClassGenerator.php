@@ -4,20 +4,14 @@ declare(strict_types=1);
 
 namespace PhpJit\ApidocTestsGenerator;
 
+use ApiPlatform\Core\Metadata\Resource\Factory\ResourceNameCollectionFactoryInterface;
 use ApiPlatform\Core\OpenApi\Model\Components;
 use ApiPlatform\Core\OpenApi\Model\PathItem;
-use ApiPlatform\Core\OpenApi\Serializer\OpenApiNormalizer;
-use ApiPlatform\Core\Serializer\ItemNormalizer;
-use Doctrine\ORM\EntityManagerInterface;
 use Faker\Generator as FakerGenerator;
-use PhpJit\ApidocTestsGenerator\Configuration\ComposerConfigurationReaderInterface;
-use PhpJit\ApidocTestsGenerator\TemplateClass\PostTemplateClassCollectionTest;
 use PhpJit\ApidocTestsGenerator\Traits\SwaggerTrait;
 use PhpParser\ParserFactory;
-use PhpParser\PrettyPrinter;
 use ReflectionClass;
 use Symfony\Component\Serializer\NameConverter\CamelCaseToSnakeCaseNameConverter;
-use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 use function str_replace;
 
 class TestClassGenerator implements TestClassGeneratorInterface
@@ -29,32 +23,33 @@ class TestClassGenerator implements TestClassGeneratorInterface
     private ReflectionClass $reflectionClass;
     private ParserFactory $parserFactory;
     private FakerGenerator $fakerGenerator;
+    private ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory;
     private array $parser;
 
     /**
      * TestClassGenerator constructor.
      * @param ParserFactory $parserFactory
-     * @param EntityManagerInterface $entityManager
      * @param FakerGenerator $fakerGenerator
-     * @param ComposerConfigurationReaderInterface $composerConfigurationReader
-     * @param DenormalizerInterface $denormalizer
+     * @param ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory
      */
-    public function __construct(ParserFactory $parserFactory, FakerGenerator $fakerGenerator, DenormalizerInterface $denormalizer)
+    public function __construct(ParserFactory $parserFactory, FakerGenerator $fakerGenerator, ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory)
     {
         $this->parserFactory = $parserFactory;
         $this->fakerGenerator = $fakerGenerator;
-        $this->denormalizer = $denormalizer;
+        $this->resourceNameCollectionFactory = $resourceNameCollectionFactory;
     }
-
     use SwaggerTrait;
-
 
     public function generate(array $templateOperation, string $route, PathItem $resource, Components $components): GeneratedTestClass
     {
-        $this->init($templateOperation['template'], $route);
-        if ($templateOperation['template'] == PostTemplateClassCollectionTest::class) {
+        $tag = current($templateOperation['operation']->getTags());
+
+        $this->init($templateOperation['template'], $route, $tag);
+
+        if ($templateOperation['method'] === 'post') {
 
             $body = $this->getRequestBody($templateOperation, $components);
+
             if ($body !== null) {
                 $this->code = str_replace('{body}', json_encode($body), $this->code);
             }
@@ -131,12 +126,39 @@ class TestClassGenerator implements TestClassGeneratorInterface
         return str_replace(['{','}'], "", $route);
     }
 
-    private function init(string $className, string $route, int $preferPhp = ParserFactory::PREFER_PHP7): void
+    private function getEntity($tag): ?string
+    {
+        $resourceNameCollection = $this->resourceNameCollectionFactory->create();
+        $entity = [];
+        foreach ($resourceNameCollection as $item) {
+            $tag = str_replace('/', "\\", $tag);
+            if (str_contains($item, $tag)) {
+                return $entity[$tag] = '\\'.$item . '::class';
+            }
+        }
+        foreach ($resourceNameCollection as $item) {
+            $tag = str_replace('/', "\\", $tag);
+            $item = str_replace('\\Entity', "", $item);
+            if (str_contains($item, $tag)) {
+                return $entity[$tag] = '\\'.$item . '::class';
+            }
+        }
+        return '\\'.$tag . '::class';
+    }
+
+    private function replaceEntity($tag, $code): void
+    {
+        $this->code = str_replace('Entity::class', $this->getEntity($tag), $code);
+    }
+
+    private function init(string $className, string $route, string $tag, int $preferPhp = ParserFactory::PREFER_PHP7): void
     {
         $this->reflectionClass = new ReflectionClass($className);
         $this->code  = $this->getClassContets();
 
         if ($this->reflectionClass->implementsInterface(TptClassTestInterface::class)) {
+
+            $this->replaceEntity($tag, $this->code);
 
             $this->replaceRoute($route, $this->code);
 

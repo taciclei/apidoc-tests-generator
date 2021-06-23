@@ -43,9 +43,8 @@ trait SwaggerTrait
                 /* @var $properties \ArrayObject */
                 $properties = $components->getSchemas()->offsetGet($schema)->offsetGet('properties');
 
-                $toto = $this->denormalizer->normalize($properties);
-                echo 'plop';
-                //dd($toto);
+                //$ttest = $this->denormalizer->normalize($properties);
+
                 $values = array_diff_key($properties, ["@context" => '', "@id" => '', "@type" => '', "id" => '']);
 
                 return $this->getBody($values);

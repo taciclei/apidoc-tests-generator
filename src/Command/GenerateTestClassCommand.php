@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PhpJit\ApidocTestsGenerator\Command;
 
+use ApiPlatform\Core\Metadata\Resource\Factory\ResourceNameCollectionFactoryInterface;
 use ApiPlatform\Core\OpenApi\Factory\OpenApiFactoryInterface;
 use ApiPlatform\Core\OpenApi\Model\Operation;
 use ApiPlatform\Core\OpenApi\Model\PathItem;
@@ -33,6 +34,7 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
     private EntityManagerInterface $entityManager;
     private ComposerConfigurationReaderInterface $composerConfigurationReader;
     private TestClassGeneratorInterface $testClassGenerator;
+    private ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory;
     private array $apiDocTemplates;
 
     /**
@@ -56,6 +58,7 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         NormalizerInterface $normalizer,
         ComposerConfigurationReaderInterface $composerConfigurationReader,
         TestClassGeneratorInterface $testClassGenerator,
+        ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory,
         array $apiDocTemplates
     )
     {
@@ -64,6 +67,7 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         $this->normalizer = $normalizer;
         $this->composerConfigurationReader = $composerConfigurationReader;
         $this->testClassGenerator = $testClassGenerator;
+        $this->resourceNameCollectionFactory = $resourceNameCollectionFactory;
         $this->apiDocTemplates = $apiDocTemplates;
     }
 
@@ -80,9 +84,10 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         $components = $this->getOpenApiFactory()->__invoke()->getComponents();
 
         foreach ($resources as $route => $resource) {
-            $templatesOperation = $this->getTemplatesOperation($resource);
+            $templatesOperation = $this->getTemplatesOperation($resource, $route);
 
             foreach ($templatesOperation as $templateOperation) {
+
                 $configuration = $this->composerConfigurationReader->createConfiguration();
                 $output->writeln(sprintf('Generating test class for <info>%s</info>', $templateOperation['template']));
                 $output->writeln('');
@@ -102,29 +107,39 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         return 0;
     }
 
-    private function getTemplatesOperation(PathItem $resource): array
+    private function getTemplatesOperation(PathItem $resource, string $route): array
     {
         $key = 0;
         $templates = [];
 
         if ($operation = $this->isGetItem($resource)) {
             $key++;
+            $templates[$key]['method'] = 'get';
             $templates[$key]['template'] = $this->apiDocTemplates['get'];
-        } elseif ($operation = $this->isGetCollection($resource)) {
-            $key++;
-            $templates[$key]['template'] = $this->apiDocTemplates['get_collection'];
-        } elseif ($operation = $this->isPost($resource)) {
-            $key++;
-            $templates[$key]['template'] = $this->apiDocTemplates['post'];
-        } elseif ($operation = $this->isDelete($resource)) {
-            $key++;
-            $templates[$key]['template'] = $this->apiDocTemplates['delete'];
-        } elseif ($operation = $this->isPut($resource)) {
-            $key++;
-            $templates[$key]['template'] = $this->apiDocTemplates['put'];
+            $templates[$key]['operation'] = $operation;
         }
-
-        if ($operation !== null && !empty($templates[$key]['template'])) {
+        if ($operation = $this->isGetCollection($resource)) {
+            $key++;
+            $templates[$key]['method'] = 'get_collection';
+            $templates[$key]['template'] = $this->apiDocTemplates['get_collection'];
+            $templates[$key]['operation'] = $operation;
+        }
+        if ($operation = $this->isPost($resource)) {
+            $key++;
+            $templates[$key]['method'] = 'post';
+            $templates[$key]['template'] = $this->apiDocTemplates['post'];
+            $templates[$key]['operation'] = $operation;
+        }
+        if ($operation = $this->isDelete($resource)) {
+            $key++;
+            $templates[$key]['method'] = 'delete';
+            $templates[$key]['template'] = $this->apiDocTemplates['delete'];
+            $templates[$key]['operation'] = $operation;
+        }
+        if ($operation = $this->isPut($resource)) {
+            $key++;
+            $templates[$key]['method'] = 'put';
+            $templates[$key]['template'] = $this->apiDocTemplates['put'];
             $templates[$key]['operation'] = $operation;
         }
 
