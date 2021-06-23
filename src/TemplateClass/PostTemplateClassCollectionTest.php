@@ -27,7 +27,7 @@ class PostTemplateClassCollectionTest extends ApiTestCase implements TptClassTes
         ]);
     }
 
-    protected function setup(): void
+    protected function setUp(): void
     {
         $this->client = static::getClient();
         $router = static::$container->get('api_platform.router');

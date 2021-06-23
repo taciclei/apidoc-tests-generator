@@ -16,7 +16,7 @@ class DeleteTemplateClassItemTest extends ApiTestCase implements TptClassTestInt
 
     use ClientTrait;
 
-    protected function setup(): void
+    protected function setUp(): void
     {
         $this->markTestSkipped();
         $this->client = static::createClient();
@@ -28,7 +28,7 @@ class DeleteTemplateClassItemTest extends ApiTestCase implements TptClassTestInt
     }
     /**
      * @group template_class
-     * @depends testCreateTemplateClass
+     * depends testCreateTemplateClass
      */
     public function testDeleteTemplateClassItem(): void
     {

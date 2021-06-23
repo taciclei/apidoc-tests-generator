@@ -16,7 +16,7 @@ class PutTemplateClassItemTest extends ApiTestCase implements TptClassTestInterf
 
     use ClientTrait;
 
-    protected function setup(): void
+    protected function setUp(): void
     {
         $this->markTestSkipped();
         $this->client = static::createClient();
@@ -27,7 +27,7 @@ class PutTemplateClassItemTest extends ApiTestCase implements TptClassTestInterf
         $this->router = $router;
     }
     /**
-     * @depends testCreateTemplateClass
+     * depends testCreateTemplateClass
      * @group template_class
      */
     public function testUpdateTemplateClass(): void
@@ -48,7 +48,7 @@ class PutTemplateClassItemTest extends ApiTestCase implements TptClassTestInterf
         ]);
     }
     /**
-     * @depends testCreateTemplateClass
+     * depends testCreateTemplateClass
      * @group template_class
      */
     public function testCreateInvalidTemplateClass(): void

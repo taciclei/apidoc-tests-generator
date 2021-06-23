@@ -26,7 +26,7 @@ class GetTemplateClassCollectionTest extends ApiTestCase implements TptClassTest
         $this->router = $router;
     }
     /**
-     * @depends testCreateTemplateClass
+     * depends testCreateTemplateClass
      * @group template_class
      */
     public function testGetTemplateClassCollection(): void

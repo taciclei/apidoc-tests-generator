@@ -14,7 +14,7 @@ class PathTemplateClassItemTest extends ApiTestCase implements TptClassTestInter
     private Router $router;
 
 
-    protected function setup(): void
+    protected function setUp(): void
     {
         $this->markTestSkipped();
         $this->client = static::createClient();
