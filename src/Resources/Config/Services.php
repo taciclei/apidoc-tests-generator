@@ -1,7 +1,6 @@
 <?php
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
-use ApiPlatform\Core\Serializer\ItemNormalizer;
 use PhpParser\ParserFactory;
 
 return function(ContainerConfigurator $configurator) {
@@ -15,7 +14,6 @@ return function(ContainerConfigurator $configurator) {
     $services->load('PhpJit\\ApidocTestsGenerator\\', '../../../src/*')
         ->exclude('../../../src/{DependencyInjection,Entity,Tests,Resources}');
 
-    $services->set(ItemNormalizer::class)->autowire()->autoconfigure()->public();
     $services->set(ParserFactory::class)->autowire()->autoconfigure()->public();
 
 };

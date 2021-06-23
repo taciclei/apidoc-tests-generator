@@ -28,11 +28,7 @@ class TestClassGenerator implements TestClassGeneratorInterface
     public string $code;
     private ReflectionClass $reflectionClass;
     private ParserFactory $parserFactory;
-    private EntityManagerInterface $entityManager;
     private FakerGenerator $fakerGenerator;
-    private ComposerConfigurationReaderInterface $composerConfigurationReader;
-    private ItemNormalizer $itemNormalizer;
-    private DenormalizerInterface $denormalizer;
     private array $parser;
 
     /**
@@ -41,16 +37,12 @@ class TestClassGenerator implements TestClassGeneratorInterface
      * @param EntityManagerInterface $entityManager
      * @param FakerGenerator $fakerGenerator
      * @param ComposerConfigurationReaderInterface $composerConfigurationReader
-     * @param ItemNormalizer $itemNormalizer
      * @param DenormalizerInterface $denormalizer
      */
-    public function __construct(ParserFactory $parserFactory, EntityManagerInterface $entityManager, FakerGenerator $fakerGenerator, ComposerConfigurationReaderInterface $composerConfigurationReader, ItemNormalizer $itemNormalizer, DenormalizerInterface $denormalizer)
+    public function __construct(ParserFactory $parserFactory, FakerGenerator $fakerGenerator, DenormalizerInterface $denormalizer)
     {
         $this->parserFactory = $parserFactory;
-        $this->entityManager = $entityManager;
         $this->fakerGenerator = $fakerGenerator;
-        $this->composerConfigurationReader = $composerConfigurationReader;
-        $this->itemNormalizer = $itemNormalizer;
         $this->denormalizer = $denormalizer;
     }
 
