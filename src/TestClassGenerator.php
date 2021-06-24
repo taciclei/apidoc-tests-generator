@@ -8,9 +8,12 @@ use ApiPlatform\Core\Metadata\Resource\Factory\ResourceNameCollectionFactoryInte
 use ApiPlatform\Core\OpenApi\Model\Components;
 use ApiPlatform\Core\OpenApi\Model\PathItem;
 use Faker\Generator as FakerGenerator;
-use PhpJit\ApidocTestsGenerator\Traits\SwaggerTrait;
+use PhpJit\ApidocTestsGenerator\Builder\RequestBodyBuilder;
+use PhpJit\ApidocTestsGenerator\Builder\RequestBodyBuilderInterface;
+use PhpJit\ApidocTestsGenerator\Builder\ResponseBuilderInterface;
 use PhpParser\ParserFactory;
 use ReflectionClass;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Serializer\NameConverter\CamelCaseToSnakeCaseNameConverter;
 use function str_replace;
 
@@ -22,50 +25,54 @@ class TestClassGenerator implements TestClassGeneratorInterface
     public string $code;
     private ReflectionClass $reflectionClass;
     private ParserFactory $parserFactory;
-    private FakerGenerator $fakerGenerator;
     private ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory;
-    private array $parser;
+    private RequestBodyBuilderInterface $requestBodyBuilder;
+    private ResponseBuilderInterface $responseBuilder;
 
     /**
      * TestClassGenerator constructor.
      * @param ParserFactory $parserFactory
-     * @param FakerGenerator $fakerGenerator
      * @param ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory
+     * @param RequestBodyBuilderInterface $requestBodyBuilder
      */
-    public function __construct(ParserFactory $parserFactory, FakerGenerator $fakerGenerator, ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory)
+    public function __construct(ParserFactory $parserFactory, ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory, RequestBodyBuilderInterface $requestBodyBuilder, ResponseBuilderInterface $responseBuilder)
     {
         $this->parserFactory = $parserFactory;
-        $this->fakerGenerator = $fakerGenerator;
         $this->resourceNameCollectionFactory = $resourceNameCollectionFactory;
+        $this->requestBodyBuilder = $requestBodyBuilder;
+        $this->responseBuilder = $responseBuilder;
     }
-    use SwaggerTrait;
+
 
     public function generate(array $templateOperation, string $route, PathItem $resource, Components $components): GeneratedTestClass
     {
         $tag = current($templateOperation['operation']->getTags());
 
         $this->init($templateOperation['template'], $route, $tag);
-
-        if ($templateOperation['method'] === 'post' || $templateOperation['method'] === 'put') {
-
-            $body = $this->getRequestBody($templateOperation, $components);
-
-            if ($body !== null) {
-                $this->code = str_replace('{body}', json_encode($body), $this->code);
+            $codeResponse = Response::HTTP_OK;
+            if ($templateOperation['method'] === 'post' || $templateOperation['method'] === 'put') {
+                $body = $this->requestBodyBuilder->getRequestBody($templateOperation['operation']);
+                $codeResponse = Response::HTTP_CREATED;
+                if ($body !== null) {
+                    $this->code = str_replace('{body}', json_encode($body), $this->code);
+                }
+            }elseif ($templateOperation['method'] === 'delete') {
+                $codeResponse = Response::HTTP_NO_CONTENT;
             }
-        }
 
-        if (preg_match('/class\s+(\w+)(.*\r*\n*)?\{/', $this->code, $matches)) {
-            $class = $matches[1];
+            if (preg_match('/class\s+(\w+)(.*\r*\n*)?\{/', $this->code, $matches)) {
+                $class = $matches[1];
+                $jsonSchema  = $this->responseBuilder->getJsonSchema($templateOperation['operation'], $codeResponse);
+                $generated = new GeneratedTestClass(
+                    $class,
+                    $this->testNamespace . '\\' . $class,
+                    $this->code,
+                    $jsonSchema
+                );
 
-            $generated = new GeneratedTestClass(
-                $class,
-                $this->testNamespace . '\\' . $class,
-                $this->code
-            );
+                return $generated;
+            }
 
-            return $generated;
-        }
     }
 
     public function toSnakeCase(string $name): string
@@ -73,20 +80,20 @@ class TestClassGenerator implements TestClassGeneratorInterface
         return (new CamelCaseToSnakeCaseNameConverter())->normalize($name);
     }
 
-    public function toCamelCase(string $name, $separator= '\\'): string
+    public function toCamelCase(string $name, $separator = '\\'): string
     {
         $array = explode($separator, $name);
         $array2 = [];
         foreach ($array as $item) {
-            $array2[] = (new CamelCaseToSnakeCaseNameConverter(null,false))->denormalize($item);
+            $array2[] = (new CamelCaseToSnakeCaseNameConverter(null, false))->denormalize($item);
         }
-        return implode($separator,$array2);
+        return implode($separator, $array2);
     }
 
     private function replaceIdentifiers(string $code, string $route): string
     {
         $arrayRoute = $this->toCamelCase($route, '/');
-        $testNamespace = str_replace('/', '',$arrayRoute);
+        $testNamespace = str_replace('/', '', $arrayRoute);
         $code = str_replace(self::IDENTIFIER, $this->toCamelCase($testNamespace), $code);
 
         return str_replace($this->toSnakeCase(self::IDENTIFIER), $testNamespace, $code);
@@ -97,9 +104,9 @@ class TestClassGenerator implements TestClassGeneratorInterface
         $this->code = str_replace('{route}', $route, $code);
     }
 
-    private function replaceNamespace(string $route):void
+    private function replaceNamespace(string $route): void
     {
-        $arrayRoute = str_replace('/','\\', $route);
+        $arrayRoute = str_replace('/', '\\', $route);
 
         $this->testNamespace = self::PATH_TESTS . $this->toCamelCase($arrayRoute);
 
@@ -123,7 +130,7 @@ class TestClassGenerator implements TestClassGeneratorInterface
 
     private function cleanRoute(string $route): string
     {
-        return str_replace(['{','}'], "", $route);
+        return str_replace(['{', '}'], "", $route);
     }
 
     private function getEntity($tag): ?string
@@ -133,17 +140,17 @@ class TestClassGenerator implements TestClassGeneratorInterface
         foreach ($resourceNameCollection as $item) {
             $tag = str_replace('/', "\\", $tag);
             if (str_contains($item, $tag)) {
-                return $entity[$tag] = '\\'.$item . '::class';
+                return $entity[$tag] = '\\' . $item . '::class';
             }
         }
         foreach ($resourceNameCollection as $item) {
             $tag = str_replace('/', "\\", $tag);
             $item = str_replace('\\Entity', "", $item);
             if (str_contains($item, $tag)) {
-                return $entity[$tag] = '\\'.$item . '::class';
+                return $entity[$tag] = '\\' . $item . '::class';
             }
         }
-        return '\\'.$tag . '::class';
+        return '\\' . $tag . '::class';
     }
 
     private function replaceEntity($tag, $code): void
@@ -154,7 +161,7 @@ class TestClassGenerator implements TestClassGeneratorInterface
     private function init(string $className, string $route, string $tag, int $preferPhp = ParserFactory::PREFER_PHP7): void
     {
         $this->reflectionClass = new ReflectionClass($className);
-        $this->code  = $this->getClassContets();
+        $this->code = $this->getClassContents();
 
         if ($this->reflectionClass->implementsInterface(TptClassTestInterface::class)) {
 
@@ -178,7 +185,7 @@ class TestClassGenerator implements TestClassGeneratorInterface
         }
     }
 
-    private function getClassContets(): string
+    private function getClassContents(): string
     {
         return file_get_contents($this->reflectionClass->getFileName());
     }

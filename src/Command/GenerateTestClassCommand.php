@@ -14,8 +14,7 @@ use PhpJit\ApidocTestsGenerator\Configuration\AutoloadingStrategy;
 use PhpJit\ApidocTestsGenerator\Configuration\ComposerConfigurationReaderInterface;
 use PhpJit\ApidocTestsGenerator\Configuration\Configuration;
 use PhpJit\ApidocTestsGenerator\TestClassGeneratorInterface;
-use PhpJit\ApidocTestsGenerator\Traits\SwaggerTrait;
-use PhpJit\ApidocTestsGenerator\Writer\Psr4TestClassWriterInterface;
+use PhpJit\ApidocTestsGenerator\Writer\Psr4TestClassWriter;
 use PhpJit\ApidocTestsGenerator\Writer\TestClassWriterInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -25,7 +24,6 @@ use function sprintf;
 
 class GenerateTestClassCommand extends Command implements GenerateTestClassCommandInterface
 {
-    use SwaggerTrait;
 
     protected static $defaultName = 'apidoc_tests:generate-classes';
 
@@ -74,7 +72,7 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
     protected function configure(): void
     {
         $this
-            ->setDescription('Generate a PHPUnit test class from a class.');
+            ->setDescription('Generate a PHPUnit test class from a apiDoc.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -204,7 +202,7 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         $autoloadingStrategy = $configuration->getAutoloadingStrategy();
 
         if ($autoloadingStrategy === AutoloadingStrategy::PSR4) {
-            return new Psr4TestClassWriterInterface($configuration);
+            return new Psr4TestClassWriter($configuration);
         }
 
         throw new InvalidArgumentException(

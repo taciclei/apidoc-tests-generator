@@ -1,58 +1,56 @@
 <?php
-
 declare(strict_types=1);
 
-namespace PhpJit\ApidocTestsGenerator\Traits;
+namespace PhpJit\ApidocTestsGenerator\Builder;
 
+use ApiPlatform\Core\OpenApi\Factory\OpenApiFactoryInterface;
 use ApiPlatform\Core\OpenApi\Model\Components;
 use ApiPlatform\Core\OpenApi\Model\MediaType;
 use ApiPlatform\Core\OpenApi\Model\Operation;
 use Carbon\Carbon;
 use Carbon\CarbonInterval;
+use Faker\Generator as FakerGenerator;
 
-trait SwaggerTrait
+class RequestBodyBuilder implements RequestBodyBuilderInterface
 {
+
     public array $resources = [];
     public array $doc = [];
+
+    private array $parser;
+    private FakerGenerator $fakerGenerator;
+    private OpenApiFactoryInterface $openApiFactory;
+    private Components $components;
+
+    /**
+     * RequestBodyBuilder constructor.
+     * @param FakerGenerator $fakerGenerator
+     * @param OpenApiFactoryInterface $openApiFactory
+     */
+    public function __construct(FakerGenerator $fakerGenerator, OpenApiFactoryInterface $openApiFactory)
+    {
+        $this->fakerGenerator = $fakerGenerator;
+        $this->components = $openApiFactory->__invoke()->getComponents();
+    }
+
 
     public function getResources(string $className): string
     {
         return $this->resources[$className]->getName();
     }
 
-    public function fetchResources()
+    public function getRequestBody(Operation $operation): ?array
     {
-        $this->entityManager = self::bootKernel()->getContainer()
-            ->get('doctrine')
-            ->getManager();
+        $schema = $this->getSchema($operation);
+        if (null !== $schema) {
+            /* @var $properties \ArrayObject */
+            $properties = $this->components->getSchemas()->offsetGet($schema)->offsetGet('properties');
 
-        $metas = $this->entityManager->getMetadataFactory()->getAllMetadata();
+            $values = array_diff_key($properties, ["@context" => '', "@id" => '', "@type" => '', "id" => '']);
 
-        foreach ($metas as $meta) {
-            $array = explode('\\', $meta->getName());
-            $name = end($array);
-            $this->resources[$name] = $meta;
+            return $this->getBody($values);
         }
-    }
-
-    public function getRequestBody(array $params, Components $components): ?array
-    {
-        try {
-            $schema = $this->getSchema($params['operation']);
-            if ($schema !== null) {
-                /* @var $properties \ArrayObject */
-                $properties = $components->getSchemas()->offsetGet($schema)->offsetGet('properties');
-
-                //$ttest = $this->denormalizer->normalize($properties);
-
-                $values = array_diff_key($properties, ["@context" => '', "@id" => '', "@type" => '', "id" => '']);
-
-                return $this->getBody($values);
-            }
-            return null;
-        } catch (\Exception $exception) {
-            dd($exception);
-        }
+        return null;
     }
 
     public function populateEnum(string $index, array $items, \ArrayObject $value): array
@@ -129,7 +127,6 @@ trait SwaggerTrait
                 $items[$index] = $this->fakerGenerator->ean13();
                 break;
             default:
-                //if($this->actualUri =='')
                 $items[$index] = $this->getValueByType($value, $index);
         }
 
@@ -177,7 +174,6 @@ trait SwaggerTrait
                     if (isset($value['items']) && !empty($value['items'])) {
                         $val = new \ArrayObject($value['items']);
                         return [];
-                        //return [$this->getValueByType($val, $index)];
                     }
                     echo 'ici';
                     dd($value);
@@ -186,12 +182,11 @@ trait SwaggerTrait
                     dd($value);
             }
         }
-        //echo  'val : '.$this->actualUri;
-        //dd($value);
     }
 
     public function getSchema(Operation $operation, $type = 'application/ld+json'): ?string
     {
+
         if ($operation->getRequestBody()->getContent()->offsetExists($type)) {
             /* @var $media MediaType */
             $media = $operation->getRequestBody()->getContent()->offsetGet($type);
@@ -199,14 +194,9 @@ trait SwaggerTrait
             if ($media->getSchema()->offsetExists('$ref')) {
                 $schema = explode('/', $media->getSchema()->offsetGet('$ref'));
                 return end($schema);
-            } else {
-                echo '$ref';
-                dd($media->getSchema()->offsetExists('$ref'));
             }
-        } else {
-            echo $type;
             return null;
-            //dd($operation->getRequestBody()->getContent());
         }
+        return null;
     }
 }

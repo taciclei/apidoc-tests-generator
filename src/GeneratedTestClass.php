@@ -13,27 +13,36 @@ class GeneratedTestClass
     private $testClassName;
 
     /** @var string */
-    private $code;
+    private string $code;
+    private ?string $jsonSchema;
 
-    public function __construct(string $className, string $testClassName, string $code)
+    public function __construct(string $className, string $testClassName, string $code, ?string $jsonSchema)
     {
-        $this->className     = $className;
+        $this->className = $className;
         $this->testClassName = $testClassName;
-        $this->code          = $code;
+        $this->code = $code;
+        $this->jsonSchema = $jsonSchema;
     }
 
-    public function getClassName() : string
+    public function getClassName(): string
     {
         return $this->className;
     }
 
-    public function getTestClassName() : string
+    public function getTestClassName(): string
     {
         return $this->testClassName;
     }
 
-    public function getCode() : string
+    public function getCode(): string
     {
         return $this->code;
     }
+
+    public function getJsonSchema(): ?string
+    {
+        return $this->jsonSchema;
+    }
+
+
 }
