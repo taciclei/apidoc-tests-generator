@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PhpJit\ApidocTestsGenerator\Writer;
 
 use PhpJit\ApidocTestsGenerator\Configuration\Configuration;
-use PhpJit\ApidocTestsGenerator\GeneratedTestClass;
+use PhpJit\ApidocTestsGenerator\GeneratedTestClassDto;
 use RuntimeException;
 use Symfony\Component\Filesystem\Filesystem;
 use const DIRECTORY_SEPARATOR;
@@ -29,11 +29,11 @@ class Psr4TestClassWriter implements TestClassWriterInterface
         $this->filesystem    = $filesystem ?? new Filesystem();
     }
 
-    public function write(GeneratedTestClass $generatedTestClass) : string
+    public function write(GeneratedTestClassDto $generatedTestClass) : string
     {
-        if(null !== $generatedTestClass->getJsonSchema()) {
+/*        if(null !== $generatedTestClass->getJsonSchema()) {
             $this->writeSchemaJson($generatedTestClass);
-        }
+        }*/
 
         $writePath = $this->generatePsr4TestWritePath($generatedTestClass);
 
@@ -43,9 +43,6 @@ class Psr4TestClassWriter implements TestClassWriterInterface
             $this->filesystem->mkdir($writeDirectory, 0777);
         }
 
-        if ($this->filesystem->exists($writePath)) {
-            //throw new RuntimeException(sprintf('Test class already exists at %s', $writePath));
-        }
         $this->filesystem->dumpFile(
             $writePath,
             $generatedTestClass->getJsonSchema()
@@ -59,7 +56,7 @@ class Psr4TestClassWriter implements TestClassWriterInterface
         return $writePath;
     }
 
-    public function writeSchemaJson(GeneratedTestClass $generatedTestClass) : string
+    public function writeSchemaJson(GeneratedTestClassDto $generatedTestClass) : string
     {
         $writePath = $this->generatePsr4TestWritePath($generatedTestClass, self::TYPE_WRITE_JSON);
 
@@ -76,7 +73,7 @@ class Psr4TestClassWriter implements TestClassWriterInterface
 
         return $writePath;
     }
-    private function generatePsr4TestWritePath(GeneratedTestClass $generatedTestClass, $type = self::TYPE_WRITE_PHP) : string
+    private function generatePsr4TestWritePath(GeneratedTestClassDto $generatedTestClass, $type = self::TYPE_WRITE_PHP) : string
     {
 
         $writePath = $this->configuration->getTestsDir();

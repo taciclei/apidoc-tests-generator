@@ -13,6 +13,7 @@ use InvalidArgumentException;
 use PhpJit\ApidocTestsGenerator\Configuration\AutoloadingStrategy;
 use PhpJit\ApidocTestsGenerator\Configuration\ComposerConfigurationReaderInterface;
 use PhpJit\ApidocTestsGenerator\Configuration\Configuration;
+use PhpJit\ApidocTestsGenerator\GeneratedTestClassDto;
 use PhpJit\ApidocTestsGenerator\TestClassGeneratorInterface;
 use PhpJit\ApidocTestsGenerator\Writer\Psr4TestClassWriter;
 use PhpJit\ApidocTestsGenerator\Writer\TestClassWriterInterface;
@@ -33,7 +34,8 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
     private ComposerConfigurationReaderInterface $composerConfigurationReader;
     private TestClassGeneratorInterface $testClassGenerator;
     private ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory;
-    private array $apiDocTemplates;
+    private array $apidocTestsGeneratorConfigTemplates;
+    private array $apidocTestsGeneratorConfigMarkTestSkipped;
 
     /**
      * @return OpenApiFactoryInterface
@@ -57,7 +59,8 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         ComposerConfigurationReaderInterface $composerConfigurationReader,
         TestClassGeneratorInterface $testClassGenerator,
         ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory,
-        array $apiDocTemplates
+        array $apidocTestsGeneratorConfigTemplates,
+        array $apidocTestsGeneratorConfigMarkTestSkipped
     )
     {
         parent::__construct();
@@ -66,7 +69,8 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         $this->composerConfigurationReader = $composerConfigurationReader;
         $this->testClassGenerator = $testClassGenerator;
         $this->resourceNameCollectionFactory = $resourceNameCollectionFactory;
-        $this->apiDocTemplates = $apiDocTemplates;
+        $this->apidocTestsGeneratorConfigTemplates = $apidocTestsGeneratorConfigTemplates;
+        $this->apidocTestsGeneratorConfigMarkTestSkipped = $apidocTestsGeneratorConfigMarkTestSkipped;
     }
 
     protected function configure(): void
@@ -80,22 +84,24 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         /* @var $resources PathItem[] */
         $resources = $this->getOpenApiFactory()->__invoke()->getPaths()->getPaths();
         $components = $this->getOpenApiFactory()->__invoke()->getComponents();
-
+        //dd($this->apidocTestsGeneratorConfigMarkTestSkipped);
         foreach ($resources as $route => $resource) {
             $templatesOperation = $this->getTemplatesOperation($resource, $route);
 
             foreach ($templatesOperation as $templateOperation) {
 
+                $generatedTestClassDto = new GeneratedTestClassDto($route, $templateOperation['method']);
+
                 $configuration = $this->composerConfigurationReader->createConfiguration();
                 $output->writeln(sprintf('Generating test class for <info>%s</info>', $templateOperation['template']));
                 $output->writeln('');
 
-                $generatedTestClass = $this->testClassGenerator->generate($templateOperation, $route, $resource, $components);
+                $this->testClassGenerator->generate($templateOperation, $generatedTestClassDto, $resource, $components);
 
-                $output->writeln($generatedTestClass->getCode());
+                $output->writeln($generatedTestClassDto->getCode());
                 $testClassWriter = $this->createTestClassWriter($configuration);
 
-                $writePath = $testClassWriter->write($generatedTestClass);
+                $writePath = $testClassWriter->write($generatedTestClassDto);
 
                 $output->writeln(sprintf('Test class written to <info>%s</info>', $writePath));
             }
@@ -113,31 +119,31 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         if ($operation = $this->isGetItem($resource)) {
             $key++;
             $templates[$key]['method'] = 'get';
-            $templates[$key]['template'] = $this->apiDocTemplates['get'];
+            $templates[$key]['template'] = $this->apidocTestsGeneratorConfigTemplates['get'];
             $templates[$key]['operation'] = $operation;
         }
         if ($operation = $this->isGetCollection($resource)) {
             $key++;
             $templates[$key]['method'] = 'get_collection';
-            $templates[$key]['template'] = $this->apiDocTemplates['get_collection'];
+            $templates[$key]['template'] = $this->apidocTestsGeneratorConfigTemplates['get_collection'];
             $templates[$key]['operation'] = $operation;
         }
         if ($operation = $this->isPost($resource)) {
             $key++;
             $templates[$key]['method'] = 'post';
-            $templates[$key]['template'] = $this->apiDocTemplates['post'];
+            $templates[$key]['template'] = $this->apidocTestsGeneratorConfigTemplates['post'];
             $templates[$key]['operation'] = $operation;
         }
         if ($operation = $this->isDelete($resource)) {
             $key++;
             $templates[$key]['method'] = 'delete';
-            $templates[$key]['template'] = $this->apiDocTemplates['delete'];
+            $templates[$key]['template'] = $this->apidocTestsGeneratorConfigTemplates['delete'];
             $templates[$key]['operation'] = $operation;
         }
         if ($operation = $this->isPut($resource)) {
             $key++;
             $templates[$key]['method'] = 'put';
-            $templates[$key]['template'] = $this->apiDocTemplates['put'];
+            $templates[$key]['template'] = $this->apidocTestsGeneratorConfigTemplates['put'];
             $templates[$key]['operation'] = $operation;
         }
 

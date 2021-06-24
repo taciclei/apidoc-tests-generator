@@ -24,10 +24,34 @@ class Configuration implements ConfigurationInterface
             ->children();
 
         $this->templatesNode($treeBuilder);
-
+        $this->markTestSkippedNode($treeBuilder);
+        $this->ignoreRoutesNode($treeBuilder);
         $treeBuilder->end();
 
         return $builder;
+    }
+
+    private function ignoreRoutesNode(NodeBuilder $treeBuilder) : void {
+        $treeBuilder
+            ->arrayNode('ignoreRoutes')
+            ->arrayPrototype()
+            ->children()
+            ->scalarNode('route')->end()
+            ->scalarNode('method')->end()
+            ->end()
+            ->end()
+        ;
+    }
+    private function markTestSkippedNode(NodeBuilder $treeBuilder) : void {
+        $treeBuilder
+            ->arrayNode('markTestSkipped')
+                ->arrayPrototype()
+                    ->children()
+                        ->scalarNode('route')->end()
+                        ->scalarNode('method')->end()
+                    ->end()
+            ->end()
+        ;
     }
 
     private function templatesNode(NodeBuilder $treeBuilder) : void {

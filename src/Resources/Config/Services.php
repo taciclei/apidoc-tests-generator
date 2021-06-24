@@ -9,7 +9,8 @@ return function(ContainerConfigurator $configurator) {
         ->defaults()
         ->autowire()      // Automatically injects dependencies in your services.
         ->autoconfigure() // Automatically registers your services as commands, event subscribers, etc
-        ->bind('$apiDocTemplates', '%apidoc_tests_generator.templates%')
+        ->bind('$apidocTestsGeneratorConfigTemplates', '%apidoc_tests_generator.templates%')
+        ->bind('$apidocTestsGeneratorConfigMarkTestSkipped', '%apidoc_tests_generator.markTestSkipped%')
     ;
     $services->load('PhpJit\\ApidocTestsGenerator\\', '../../../src/*')
         ->exclude('../../../src/{DependencyInjection,Entity,Tests,Resources}');

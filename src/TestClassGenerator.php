@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PhpJit\ApidocTestsGenerator;
 
+use Api\Bundle\CoreBundle\Tests\Functionnal\Sale\GenerateAdminSaleTest;
 use ApiPlatform\Core\Metadata\Resource\Factory\ResourceNameCollectionFactoryInterface;
 use ApiPlatform\Core\OpenApi\Model\Components;
 use ApiPlatform\Core\OpenApi\Model\PathItem;
 use Faker\Generator as FakerGenerator;
+use PhpJit\ApidocTestsGenerator\Builder\MarkSkippedBuilderInterface;
 use PhpJit\ApidocTestsGenerator\Builder\RequestBodyBuilder;
 use PhpJit\ApidocTestsGenerator\Builder\RequestBodyBuilderInterface;
 use PhpJit\ApidocTestsGenerator\Builder\ResponseBuilderInterface;
@@ -28,50 +30,48 @@ class TestClassGenerator implements TestClassGeneratorInterface
     private ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory;
     private RequestBodyBuilderInterface $requestBodyBuilder;
     private ResponseBuilderInterface $responseBuilder;
+    private MarkSkippedBuilderInterface $markSkippedBuilder;
 
-    /**
-     * TestClassGenerator constructor.
-     * @param ParserFactory $parserFactory
-     * @param ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory
-     * @param RequestBodyBuilderInterface $requestBodyBuilder
-     */
-    public function __construct(ParserFactory $parserFactory, ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory, RequestBodyBuilderInterface $requestBodyBuilder, ResponseBuilderInterface $responseBuilder)
+    public function __construct(ParserFactory $parserFactory, ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory, RequestBodyBuilderInterface $requestBodyBuilder, ResponseBuilderInterface $responseBuilder, MarkSkippedBuilderInterface $markSkippedBuilder)
     {
         $this->parserFactory = $parserFactory;
         $this->resourceNameCollectionFactory = $resourceNameCollectionFactory;
         $this->requestBodyBuilder = $requestBodyBuilder;
         $this->responseBuilder = $responseBuilder;
+        $this->markSkippedBuilder = $markSkippedBuilder;
     }
 
 
-    public function generate(array $templateOperation, string $route, PathItem $resource, Components $components): GeneratedTestClass
+    public function generate(array $templateOperation, GeneratedTestClassDto $generatedTestClassDto, PathItem $resource, Components $components): void
     {
         $tag = current($templateOperation['operation']->getTags());
 
-        $this->init($templateOperation['template'], $route, $tag);
+        $this->init($templateOperation['template'], $generatedTestClassDto, $tag);
             $codeResponse = Response::HTTP_OK;
-            if ($templateOperation['method'] === 'post' || $templateOperation['method'] === 'put') {
+            if ($generatedTestClassDto->getMethod() === 'post' || $generatedTestClassDto->getMethod() === 'put') {
                 $body = $this->requestBodyBuilder->getRequestBody($templateOperation['operation']);
                 $codeResponse = Response::HTTP_CREATED;
                 if ($body !== null) {
-                    $this->code = str_replace('{body}', json_encode($body), $this->code);
+                    $code = str_replace('{body}', json_encode($body), $generatedTestClassDto->getCode());
+                    $generatedTestClassDto->setCode($code);
                 }
-            }elseif ($templateOperation['method'] === 'delete') {
+
+            }elseif ($generatedTestClassDto->getMethod() === 'delete') {
                 $codeResponse = Response::HTTP_NO_CONTENT;
             }
 
-            if (preg_match('/class\s+(\w+)(.*\r*\n*)?\{/', $this->code, $matches)) {
+            if (preg_match('/class\s+(\w+)(.*\r*\n*)?\{/', $generatedTestClassDto->getCode(), $matches)) {
                 $class = $matches[1];
                 $jsonSchema  = $this->responseBuilder->getJsonSchema($templateOperation['operation'], $codeResponse);
-                $generated = new GeneratedTestClass(
-                    $class,
-                    $this->testNamespace . '\\' . $class,
-                    $this->code,
-                    $jsonSchema
-                );
 
-                return $generated;
+                if($jsonSchema === null){
+                    $this->markSkippedBuilder->write($generatedTestClassDto, 'response:not jsonSchema or status code');
+                }
+                $generatedTestClassDto->setClassName($class)
+                    ->setjsonSchema($jsonSchema)
+                    ->setTestClassName($generatedTestClassDto->getTestClassName(). '\\' . $class);
             }
+            //dd($generatedTestClassDto->getRoute());
 
     }
 
@@ -104,14 +104,14 @@ class TestClassGenerator implements TestClassGeneratorInterface
         $this->code = str_replace('{route}', $route, $code);
     }
 
-    private function replaceNamespace(string $route): void
+    private function replaceNamespace(GeneratedTestClassDto $generatedTestClassDto, $templateRoute): void
     {
-        $arrayRoute = str_replace('/', '\\', $route);
+        $arrayRoute = str_replace('/', '\\', $templateRoute);
 
-        $this->testNamespace = self::PATH_TESTS . $this->toCamelCase($arrayRoute);
-
-        if ($this->checkNamespace($this->testNamespace)) {
-            $this->code = str_replace($this->reflectionClass->getNamespaceName(), $this->testNamespace, $this->code);
+        $testNamespace = self::PATH_TESTS . $this->toCamelCase($arrayRoute);
+        $generatedTestClassDto->setTestClassName($testNamespace);
+        if ($this->checkNamespace($generatedTestClassDto->getTestClassName())) {
+            $this->code = str_replace($this->reflectionClass->getNamespaceName(), $generatedTestClassDto->getTestClassName(), $this->code);
         }
 
     }
@@ -158,7 +158,7 @@ class TestClassGenerator implements TestClassGeneratorInterface
         $this->code = str_replace('Entity::class', $this->getEntity($tag), $code);
     }
 
-    private function init(string $className, string $route, string $tag, int $preferPhp = ParserFactory::PREFER_PHP7): void
+    private function init(string $className, GeneratedTestClassDto $generatedTestClassDto, string $tag, int $preferPhp = ParserFactory::PREFER_PHP7): void
     {
         $this->reflectionClass = new ReflectionClass($className);
         $this->code = $this->getClassContents();
@@ -167,13 +167,13 @@ class TestClassGenerator implements TestClassGeneratorInterface
 
             $this->replaceEntity($tag, $this->code);
 
-            $this->replaceRoute($route, $this->code);
+            $this->replaceRoute($generatedTestClassDto->getRoute(), $this->code);
 
-            $templateRoute = $this->cleanRoute($route);
-            $this->replaceNamespace($templateRoute);
+            $templateRoute = $this->cleanRoute($generatedTestClassDto->getRoute());
+            $this->replaceNamespace($generatedTestClassDto, $templateRoute);
 
-            $this->code = $this->replaceIdentifiers($this->code, $templateRoute);
-
+            $code = $this->replaceIdentifiers($this->code, $templateRoute);
+            $generatedTestClassDto->setCode($code);
             try {
                 $parser = $this->parserFactory->create($preferPhp);
                 $this->parser = $parser->parse($this->code);

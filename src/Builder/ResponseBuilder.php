@@ -17,14 +17,16 @@ class ResponseBuilder implements ResponseBuilderInterface
     private FakerGenerator $fakerGenerator;
     private OpenApiFactoryInterface $openApiFactory;
     private Components $components;
+    private array $apidocTestsGeneratorConfigMarkTestSkipped;
     /**
      * RequestBodyBuilder constructor.
      * @param FakerGenerator $fakerGenerator
      * @param OpenApiFactoryInterface $openApiFactory
      */
-    public function __construct(FakerGenerator $fakerGenerator, OpenApiFactoryInterface $openApiFactory)
+    public function __construct(FakerGenerator $fakerGenerator, OpenApiFactoryInterface $openApiFactory, array $apidocTestsGeneratorConfigMarkTestSkipped)
     {
         $this->fakerGenerator = $fakerGenerator;
+        $this->apidocTestsGeneratorConfigMarkTestSkipped = $apidocTestsGeneratorConfigMarkTestSkipped;
         $this->components = $openApiFactory->__invoke()->getComponents();
     }
 
@@ -53,15 +55,8 @@ class ResponseBuilder implements ResponseBuilderInterface
                     return end($schema);
                 }
             }
-                echo 'la3';
-            //dd($response);
             }
-            echo 'la2';
-            //dd($response);
         }
-        echo 'la1';
-        //dd($operation->getResponses());
-
         return null;
     }
 }
