@@ -7,7 +7,7 @@ use ApiPlatform\Core\OpenApi\Model\PathItem;
 
 interface TestClassGeneratorInterface
 {
-    public function generate(array $templateOperation, string $route, PathItem $resource, Components $components): GeneratedTestClass;
+    public function generate(array $templateOperation, GeneratedTestClassDto $generatedTestClassDto, PathItem $resource, Components $components): void;
 
     public function toSnakeCase(string $name): string;
 
