@@ -1,12 +1,13 @@
 <?php
 declare(strict_types=1);
 
-namespace PhpJit\ApidocTestsGenerator\TemplateClass;
+namespace PhpJit\ApidocTestsGeneratorTemplateClass;
 
 use ApiPlatform\Core\Bridge\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Core\Bridge\Symfony\Bundle\Test\Client;
 use ApiPlatform\Core\Bridge\Symfony\Routing\Router;
 use App\Tests\Libs\ClientTrait;
+use App\Tests\Libs\RefreshDatabaseTrait;
 use PhpJit\ApidocTestsGenerator\TptClassTestInterface;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -20,8 +21,7 @@ class DeleteTemplateClassItemTest extends ApiTestCase implements TptClassTestInt
     {
         parent::setUp();
         $this->token = self::getToken();
-        $this->markTestSkipped();
-        $this->client = static::createClient();
+        $this->client = self::getClient($this->token);
         $router = static::$container->get('api_platform.router');
         if (!$router instanceof Router) {
             throw new \RuntimeException('api_platform.router service not found.');
@@ -34,14 +34,13 @@ class DeleteTemplateClassItemTest extends ApiTestCase implements TptClassTestInt
      */
     public function testDeleteTemplateClassItem(): void
     {
-        $this->markTestSkipped();
-        $client = self::getClient($this->token);
-        $iri = (string) $this->findIriBy(Entity::class, ['id' => '1']);
-        $client->request('DELETE', $iri);
+        //$this->markTestSkipped();
+        $iri = (string) $this->findIriBy(Entity::class, []);
+        $this->client->request('DELETE', $iri);
 
         self::assertResponseStatusCodeSame(Response::HTTP_NO_CONTENT);
         self::assertNull(
-            static::$container->get('doctrine')->getRepository(Entity::class)->findOneBy(['id' => 'id'])
+            static::$container->get('doctrine')->getRepository(Entity::class)->findOneBy([])
         );
     }
 }

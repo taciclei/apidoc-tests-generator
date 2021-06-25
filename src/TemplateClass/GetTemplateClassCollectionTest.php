@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace PhpJit\ApidocTestsGenerator\TemplateClass;
+namespace PhpJit\ApidocTestsGeneratorTemplateClass;
 
 use ApiPlatform\Core\Bridge\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Core\Bridge\Symfony\Bundle\Test\Client;
@@ -19,7 +19,6 @@ class GetTemplateClassCollectionTest extends ApiTestCase implements TptClassTest
     {
         parent::setUp();
         $this->token = self::getToken();
-        $this->markTestSkipped();
         $this->client = self::getClient($this->token);
         $router = static::$container->get('api_platform.router');
         if (!$router instanceof Router) {
@@ -33,17 +32,11 @@ class GetTemplateClassCollectionTest extends ApiTestCase implements TptClassTest
      */
     public function testGetTemplateClassCollection(): void
     {
-        $this->markTestSkipped();
+        //$this->markTestSkipped();
         $this->client->request('GET', '{route}');
         self::assertResponseIsSuccessful();
         self::assertResponseHeaderSame('content-type', 'application/ld+json; charset=utf-8');
-        self::assertJsonContains([
-            '@context' => '/contexts/TemplateClass',
-            '@id' => '/template_class',
-            '@type' => 'hydra:Collection'
-        ]);
 
-        static::assertMatchesJsonSchema(file_get_contents(__DIR__.'/schemas/template_class.json'));
-        self::assertMatchesResourceCollectionJsonSchema(Entity::class);
+        //self::assertMatchesResourceCollectionJsonSchema(Entity::class);
     }
 }

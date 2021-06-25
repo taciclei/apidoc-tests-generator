@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace PhpJit\ApidocTestsGenerator\TemplateClass;
+namespace PhpJit\ApidocTestsGeneratorTemplateClass;
 
 use ApiPlatform\Core\Bridge\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Core\Bridge\Symfony\Bundle\Test\Client;
@@ -16,7 +16,7 @@ class PathTemplateClassItemTest extends ApiTestCase implements TptClassTestInter
 
     protected function setUp(): void
     {
-        $this->markTestSkipped();
+        //$this->markTestSkipped();
         $this->client = static::createClient();
         $router = static::$container->get('api_platform.router');
         if (!$router instanceof Router) {
