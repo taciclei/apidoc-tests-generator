@@ -126,6 +126,13 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
             case "isbn":
                 $items[$index] = $this->fakerGenerator->ean13();
                 break;
+            case "expiredAt":
+                $items[$index] = Carbon::now()
+                    ->hours(0)
+                    ->minutes(0)
+                    ->seconds(0)
+                    ->format(\DateTimeInterface::ISO8601);;
+                break;
             default:
                 $items[$index] = $this->getValueByType($value, $index);
         }
@@ -145,7 +152,7 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
                             return CarbonInterval::days(3)->seconds(32)->format('%rP%yY%mM%dDT%hH%iM%sS');
                         }
                         if ($value->offsetGet('format') == 'date-time') {
-                            return (string)Carbon::now()
+                            return Carbon::now()
                                 ->hours(0)
                                 ->minutes(0)
                                 ->seconds(0)

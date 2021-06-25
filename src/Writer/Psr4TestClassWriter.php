@@ -31,9 +31,9 @@ class Psr4TestClassWriter implements TestClassWriterInterface
 
     public function write(GeneratedTestClassDto $generatedTestClass) : string
     {
-/*        if(null !== $generatedTestClass->getJsonSchema()) {
+        if(null !== $generatedTestClass->getJsonSchema()) {
             $this->writeSchemaJson($generatedTestClass);
-        }*/
+        }
 
         $writePath = $this->generatePsr4TestWritePath($generatedTestClass);
 

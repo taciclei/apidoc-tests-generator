@@ -36,6 +36,7 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
     private ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory;
     private array $apidocTestsGeneratorConfigTemplates;
     private array $apidocTestsGeneratorConfigMarkTestSkipped;
+    private array $apidocTestsGeneratorConfigIgnoreRoutes;
 
     /**
      * @return OpenApiFactoryInterface
@@ -60,7 +61,8 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         TestClassGeneratorInterface $testClassGenerator,
         ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory,
         array $apidocTestsGeneratorConfigTemplates,
-        array $apidocTestsGeneratorConfigMarkTestSkipped
+        array $apidocTestsGeneratorConfigMarkTestSkipped,
+        array $apidocTestsGeneratorConfigIgnoreRoutes
     )
     {
         parent::__construct();
@@ -71,6 +73,7 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         $this->resourceNameCollectionFactory = $resourceNameCollectionFactory;
         $this->apidocTestsGeneratorConfigTemplates = $apidocTestsGeneratorConfigTemplates;
         $this->apidocTestsGeneratorConfigMarkTestSkipped = $apidocTestsGeneratorConfigMarkTestSkipped;
+        $this->apidocTestsGeneratorConfigIgnoreRoutes = $apidocTestsGeneratorConfigIgnoreRoutes;
     }
 
     protected function configure(): void
@@ -79,16 +82,30 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
             ->setDescription('Generate a PHPUnit test class from a apiDoc.');
     }
 
+    public function isIgnoreRoutes(string $route, string $method): bool
+    {
+        foreach ($this->apidocTestsGeneratorConfigIgnoreRoutes as $ignoreRoutes) {
+            if($ignoreRoutes == ['route' => $route, 'method' => $method]) {
+                return true;
+            }
+        }
+
+        return false;
+    }
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         /* @var $resources PathItem[] */
         $resources = $this->getOpenApiFactory()->__invoke()->getPaths()->getPaths();
         $components = $this->getOpenApiFactory()->__invoke()->getComponents();
-        //dd($this->apidocTestsGeneratorConfigMarkTestSkipped);
+
         foreach ($resources as $route => $resource) {
             $templatesOperation = $this->getTemplatesOperation($resource, $route);
 
             foreach ($templatesOperation as $templateOperation) {
+
+                if($this->isIgnoreRoutes($route, $templateOperation['method'])){
+                    continue;
+                }
 
                 $generatedTestClassDto = new GeneratedTestClassDto($route, $templateOperation['method']);
 
