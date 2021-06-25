@@ -100,7 +100,9 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
 
         foreach ($resources as $route => $resource) {
             $templatesOperation = $this->getTemplatesOperation($resource, $route);
-
+            if($this->isIgnoreRoutes($route, '*')){
+                continue;
+            }
             foreach ($templatesOperation as $templateOperation) {
 
                 if($this->isIgnoreRoutes($route, $templateOperation['method'])){
