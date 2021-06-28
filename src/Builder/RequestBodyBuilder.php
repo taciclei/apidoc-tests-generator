@@ -73,14 +73,16 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
         return $this;
     }
 
-    public function getEntityNamespace(string $className): string
+    public function getEntityNamespace(string $className): ?string
     {
-        $classes = $this->resourceNameCollection->create()->getIterator();
-        foreach ($classes as $classe) {
-            if (str_contains($classe, $className)) {
-                return $classe;
+            $classes = $this->resourceNameCollection->create()->getIterator();
+            foreach ($classes as $classe) {
+                if (str_contains($classe, $className)) {
+                    return $classe;
+                }
             }
-        }
+
+            return null;
     }
 
 
@@ -233,7 +235,6 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
                         }
 
                         if ($value->offsetGet('format') == 'iri-reference') {
-                            dd($value);
                             //return [$this->getIri($value)];
 
                         }
@@ -289,24 +290,27 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
     protected function findIriBy(string $resourceClass, array $criteria): ?string
     {
         $resourceClass = $this->getEntityNamespace($resourceClass);
-        if (
-            (
-                !$this->container->has('doctrine') ||
-                null === $objectManager = $this->container->get('doctrine')->getManagerForClass($resourceClass)
-            ) &&
-            (
-                !$this->container->has('doctrine_mongodb') ||
-                null === $objectManager = $this->container->get('doctrine_mongodb')->getManagerForClass($resourceClass)
-            )
-        ) {
-            throw new \RuntimeException(sprintf('"%s" only supports classes managed by Doctrine ORM or Doctrine MongoDB ODM. Override this method to implement your own retrieval logic if you don\'t use those libraries.', __METHOD__));
-        }
+        if (null !== $resourceClass) {
+            if (
+                (
+                    !$this->container->has('doctrine') ||
+                    null === $objectManager = $this->container->get('doctrine')->getManagerForClass($resourceClass)
+                ) &&
+                (
+                    !$this->container->has('doctrine_mongodb') ||
+                    null === $objectManager = $this->container->get('doctrine_mongodb')->getManagerForClass($resourceClass)
+                )
+            ) {
+                throw new \RuntimeException(sprintf('"%s" only supports classes managed by Doctrine ORM or Doctrine MongoDB ODM. Override this method to implement your own retrieval logic if you don\'t use those libraries.', __METHOD__));
+            }
 
-        $item = $objectManager->getRepository($resourceClass)->findOneBy($criteria);
-        if (null === $item) {
-            return null;
-        }
+            $item = $objectManager->getRepository($resourceClass)->findOneBy($criteria);
+            if (null === $item) {
+                return null;
+            }
 
-        return $this->iriConverter->getIriFromItem($item);
+            return $this->iriConverter->getIriFromItem($item);
+        }
+        return null;
     }
 }
