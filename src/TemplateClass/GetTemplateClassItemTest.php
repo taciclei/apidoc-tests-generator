@@ -1,23 +1,23 @@
 <?php
 declare(strict_types=1);
 
-namespace PhpJit\ApidocTestsGeneratorTemplateClass;
+namespace PhpJit\ApidocTestsGenerator\TemplateClass;
 
 use ApiPlatform\Core\Bridge\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Core\Bridge\Symfony\Bundle\Test\Client;
 use ApiPlatform\Core\Bridge\Symfony\Routing\Router;
-use App\Tests\Libs\ClientTrait;
 use PhpJit\ApidocTestsGenerator\TptClassTestInterface;
+use PhpJit\ApidocTestsGenerator\Traits\ClientTrait;
 
-class GetTemplateClassItemTest extends ApiTestCase implements TptClassTestInterface {
+class GetTemplateClassItemTest extends ApiTestCase implements TptClassTestInterface
+{
+    use ClientTrait;
     private Client $client;
     private Router $router;
-
-    use ClientTrait;
+    private string $token;
 
     protected function setUp(): void
     {
-
         parent::setUp();
         $this->token = self::getToken();
         $this->client = self::getClient($this->token);
@@ -38,11 +38,6 @@ class GetTemplateClassItemTest extends ApiTestCase implements TptClassTestInterf
         $this->client->request('GET', $iri);
         self::assertResponseIsSuccessful();
         self::assertResponseHeaderSame('content-type', 'application/ld+json; charset=utf-8');
-/*        self::assertJsonContains([
-            '@context' => '/contexts/TemplateClass',
-            '@id' => '/template_class',
-            '@type' => 'hydra:Item'
-        ]);*/
-        //static::assertMatchesJsonSchema(file_get_contents(__DIR__.'/template_class.json'));
+        self::assertMatchesResourceItemJsonSchema(Entity::class);
     }
 }

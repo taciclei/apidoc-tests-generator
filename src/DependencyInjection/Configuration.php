@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace PhpJit\ApidocTestsGenerator\DependencyInjection;
 
-use PhpJit\ApidocTestsGenerator\TemplateClass\DeleteTemplateClassItemTest;
+use PhpJit\ApidocTestsGenerator\TemplateClass\RemoveTemplateClassItemTest;
 use PhpJit\ApidocTestsGenerator\TemplateClass\GetTemplateClassCollectionTest;
 use PhpJit\ApidocTestsGenerator\TemplateClass\GetTemplateClassItemTest;
-use PhpJit\ApidocTestsGenerator\TemplateClass\PathTemplateClassItemTest;
+use PhpJit\ApidocTestsGenerator\TemplateClass\PatchTemplateClassItemTest;
 use PhpJit\ApidocTestsGenerator\TemplateClass\PostTemplateClassCollectionTest;
 use PhpJit\ApidocTestsGenerator\TemplateClass\PutTemplateClassItemTest;
 use Symfony\Component\Config\Definition\Builder\NodeBuilder;
@@ -63,8 +63,8 @@ class Configuration implements ConfigurationInterface
                     ->scalarNode('get')->defaultValue(GetTemplateClassItemTest::class)->end()
                     ->scalarNode('get_collection')->defaultValue(GetTemplateClassCollectionTest::class)->end()
                     ->scalarNode('put')->defaultValue(PutTemplateClassItemTest::class)->end()
-                    ->scalarNode('patch')->defaultValue(PathTemplateClassItemTest::class)->end()
-                    ->scalarNode('delete')->defaultValue(DeleteTemplateClassItemTest::class)->end()
+                    ->scalarNode('patch')->defaultValue(PatchTemplateClassItemTest::class)->end()
+                    ->scalarNode('delete')->defaultValue(RemoveTemplateClassItemTest::class)->end()
                 ->end()
             ->end()
         ;

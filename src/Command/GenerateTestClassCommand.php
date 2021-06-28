@@ -16,7 +16,7 @@ use PhpJit\ApidocTestsGenerator\Configuration\Configuration;
 use PhpJit\ApidocTestsGenerator\GeneratedTestClassDto;
 use PhpJit\ApidocTestsGenerator\TestClassGeneratorInterface;
 use PhpJit\ApidocTestsGenerator\Writer\Psr4TestClassWriter;
-use PhpJit\ApidocTestsGenerator\Writer\TestClassWriterInterface;
+use PhpJit\ApidocTestsGenerator\Writer\Psr4TestClassWriterInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -222,7 +222,7 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         return $this->isMethodExists($operationId, 'get', 'Collection');
     }
 
-    private function createTestClassWriter(Configuration $configuration): TestClassWriterInterface
+    private function createTestClassWriter(Configuration $configuration): Psr4TestClassWriterInterface
     {
         $autoloadingStrategy = $configuration->getAutoloadingStrategy();
 

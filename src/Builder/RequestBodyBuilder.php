@@ -3,54 +3,98 @@ declare(strict_types=1);
 
 namespace PhpJit\ApidocTestsGenerator\Builder;
 
+use ApiPlatform\Core\Api\IriConverterInterface;
+use ApiPlatform\Core\Metadata\Resource\Factory\ResourceNameCollectionFactoryInterface;
 use ApiPlatform\Core\OpenApi\Factory\OpenApiFactoryInterface;
 use ApiPlatform\Core\OpenApi\Model\Components;
 use ApiPlatform\Core\OpenApi\Model\MediaType;
 use ApiPlatform\Core\OpenApi\Model\Operation;
+use ApiPlatform\Core\OpenApi\Model\PathItem;
 use Carbon\Carbon;
 use Carbon\CarbonInterval;
 use Faker\Generator as FakerGenerator;
+use ApiPlatform\Core\Identifier\Normalizer\DateTimeIdentifierDenormalizer;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use ApiPlatform\Core\Hydra\Serializer\DocumentationNormalizer;
+
 
 class RequestBodyBuilder implements RequestBodyBuilderInterface
 {
 
-    public array $resources = [];
+    public PathItem $resources;
     public array $doc = [];
+    public array $values = [];
 
     private array $parser;
     private FakerGenerator $fakerGenerator;
     private OpenApiFactoryInterface $openApiFactory;
     private Components $components;
+    private DateTimeIdentifierDenormalizer $dateTimeNormalizer;
+    public ContainerInterface $container;
+    private ResourceNameCollectionFactoryInterface $resourceMetadataFactory;
+    private IriConverterInterface $iriConverter;
+    private DocumentationNormalizer $itemNormalizer;
+    private ResourceNameCollectionFactoryInterface $resourceNameCollection;
 
-    /**
-     * RequestBodyBuilder constructor.
-     * @param FakerGenerator $fakerGenerator
-     * @param OpenApiFactoryInterface $openApiFactory
-     */
-    public function __construct(FakerGenerator $fakerGenerator, OpenApiFactoryInterface $openApiFactory)
+    public function __construct(FakerGenerator $fakerGenerator,
+                                OpenApiFactoryInterface $openApiFactory,
+                                DateTimeIdentifierDenormalizer $dateTimeNormalizer,
+                                ContainerInterface $container,
+                                ResourceNameCollectionFactoryInterface $resourceNameCollection,
+                                IriConverterInterface $iriConverter,
+                                DocumentationNormalizer $itemNormalizer
+    )
     {
+        $this->container = $container;
+        $this->iriConverter = $iriConverter;
+        $this->resourceNameCollection = $resourceNameCollection;
         $this->fakerGenerator = $fakerGenerator;
         $this->components = $openApiFactory->__invoke()->getComponents();
+        $this->dateTimeNormalizer = $dateTimeNormalizer;
+        $this->itemNormalizer = $itemNormalizer;
+
     }
 
-
-    public function getResources(string $className): string
+    /**
+     * @return array
+     */
+    public function getResources(): PathItem
     {
-        return $this->resources[$className]->getName();
+        return $this->resources;
     }
 
-    public function getRequestBody(Operation $operation): ?array
+    /**
+     * @param array $resources
+     * @return RequestBodyBuilder
+     */
+    public function setResources(PathItem $resources): RequestBodyBuilder
+    {
+        $this->resources = $resources;
+        return $this;
+    }
+
+    public function getEntityNamespace(string $className): string
+    {
+        $classes = $this->resourceNameCollection->create()->getIterator();
+        foreach ($classes as $classe) {
+            if (str_contains($classe, $className)) {
+                return $classe;
+            }
+        }
+    }
+
+
+    public function getRequestBody(Operation $operation): self
     {
         $schema = $this->getSchema($operation);
         if (null !== $schema) {
             /* @var $properties \ArrayObject */
             $properties = $this->components->getSchemas()->offsetGet($schema)->offsetGet('properties');
 
-            $values = array_diff_key($properties, ["@context" => '', "@id" => '', "@type" => '', "id" => '']);
-
-            return $this->getBody($values);
+            $this->values = array_diff_key($properties, ["@context" => '', "@id" => '', "@type" => '', "id" => '']);
         }
-        return null;
+
+        return $this;
     }
 
     public function populateEnum(string $index, array $items, \ArrayObject $value): array
@@ -71,30 +115,56 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
         return $items;
     }
 
-    public function getBody(array $values, array $required = []): array
+    public function getBodyInvalid(): array
     {
         $items = [];
 
-        foreach ($values as $index => $value) {
-            if (empty($value)) {
-                $items[$index] = $value;
-                continue;
+        foreach ($this->values as $index => $value) {
+            /* @var $value \ArrayObject */
+
+            if ($value->offsetExists('type')) {
+                switch ($value->offsetGet('type')) {
+                    case "boolean":
+                    case "integer":
+                    case "number":
+                    case "array":
+                        $items[$index] = 'fake';
+                    default:
+                        $items[$index] = false;
+                }
+            } else {
+                //dd($value);
             }
+        }
+        return $items;
+    }
 
-            $items = $this->populateEnum($index, $items, $value);
+    public function getBody(): array
+    {
+        $items = [];
 
-            if (!array_key_exists($index, $items)) {
-                $items = $this->populateExample($index, $items, $value);
+        if (is_array($this->values)) {
+            foreach ($this->values as $index => $value) {
+                if (empty($value)) {
+                    $items[$index] = $value;
+                    continue;
+                }
+
+                $items = $this->populateEnum($index, $items, $value);
 
                 if (!array_key_exists($index, $items)) {
-                    $items = $this->getFakerType($index, $items, $value);
+                    $items = $this->populateExample($index, $items, $value);
+
+                    if (!array_key_exists($index, $items)) {
+                        $items = $this->getFakerType($index, $items, $value);
+                    }
+
                 }
 
             }
 
+            return $items;
         }
-
-        return $items;
     }
 
     public function getFakerType(string $index, array $items, \ArrayObject $value): array
@@ -127,11 +197,11 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
                 $items[$index] = $this->fakerGenerator->ean13();
                 break;
             case "expiredAt":
-                $items[$index] = Carbon::now()
+                $items[$index] = $this->dateTimeNormalizer->normalize(Carbon::now()
                     ->hours(0)
                     ->minutes(0)
                     ->seconds(0)
-                    ->format(\DateTimeInterface::ISO8601);;
+                );
                 break;
             default:
                 $items[$index] = $this->getValueByType($value, $index);
@@ -152,21 +222,19 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
                             return CarbonInterval::days(3)->seconds(32)->format('%rP%yY%mM%dDT%hH%iM%sS');
                         }
                         if ($value->offsetGet('format') == 'date-time') {
-                            return Carbon::now()
+                            return $this->dateTimeNormalizer->normalize(Carbon::now()
                                 ->hours(0)
                                 ->minutes(0)
                                 ->seconds(0)
-                                ->format(\DateTimeInterface::ISO8601);
+                            );
                         }
                         if ($value->offsetGet('format') == 'uuid') {
                             return $this->fakerGenerator->uuid();
                         }
 
                         if ($value->offsetGet('format') == 'iri-reference') {
-                            //$res = $this->getResources('Endowment');
-                            //$iri = $this->findIriBy($res, []);
-                            echo 'iri-referenc';
-                            //dd($iri);
+                            dd($value);
+                            //return [$this->getIri($value)];
 
                         }
                         return $this->fakerGenerator->text(10, 20);
@@ -176,18 +244,26 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
                     return $this->fakerGenerator->email();
                 case "integer":
                 case "number":
-                    return $this->fakerGenerator->randomNumber(3, 10);
+                    return $this->fakerGenerator->randomNumber(1);
                 case "array":
                     if (isset($value['items']) && !empty($value['items'])) {
-                        $val = new \ArrayObject($value['items']);
+                        $value = new \ArrayObject($value['items']);
                         return [];
+                        //return [$this->getIri($value)];
                     }
-                    echo 'ici';
-                    dd($value);
-                default:
-                    echo 'def';
-                    dd($value);
             }
+        }
+        if ($value->offsetExists('$ref')) {;
+            return $this->getIri($value);
+        }
+    }
+
+    public function getIri(\ArrayObject $value): ?string
+    {
+        if ($value->offsetExists('$ref')) {
+            $schema = explode('/', $value->offsetGet('$ref'));
+            $entity = explode('.', end($schema));
+                return $this->findIriBy(current($entity), []);
         }
     }
 
@@ -205,5 +281,32 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
             return null;
         }
         return null;
+    }
+
+    /**
+     * Finds the IRI of a resource item matching the resource class and the specified criteria.
+     */
+    protected function findIriBy(string $resourceClass, array $criteria): ?string
+    {
+        $resourceClass = $this->getEntityNamespace($resourceClass);
+        if (
+            (
+                !$this->container->has('doctrine') ||
+                null === $objectManager = $this->container->get('doctrine')->getManagerForClass($resourceClass)
+            ) &&
+            (
+                !$this->container->has('doctrine_mongodb') ||
+                null === $objectManager = $this->container->get('doctrine_mongodb')->getManagerForClass($resourceClass)
+            )
+        ) {
+            throw new \RuntimeException(sprintf('"%s" only supports classes managed by Doctrine ORM or Doctrine MongoDB ODM. Override this method to implement your own retrieval logic if you don\'t use those libraries.', __METHOD__));
+        }
+
+        $item = $objectManager->getRepository($resourceClass)->findOneBy($criteria);
+        if (null === $item) {
+            return null;
+        }
+
+        return $this->iriConverter->getIriFromItem($item);
     }
 }

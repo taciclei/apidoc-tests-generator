@@ -12,6 +12,8 @@ class GeneratedTestClassDto
     public ?string $testClassName  = null;
     public ?string $code = null;
     public ?string $jsonSchema  = null;
+    public ?string $body = null;
+    public ?string $bodInvalid = null;
 
     public function __construct(?string $route, ?string $methode)
     {
@@ -127,4 +129,39 @@ class GeneratedTestClassDto
         return $this;
     }
 
+    /**
+     * @return string|null
+     */
+    public function getBody(): ?string
+    {
+        return $this->body;
+    }
+
+    /**
+     * @param string|null $body
+     * @return GeneratedTestClassDto
+     */
+    public function setBody(?string $body): GeneratedTestClassDto
+    {
+        $this->body = $body;
+        return $this;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getBodInvalid(): ?string
+    {
+        return $this->bodInvalid;
+    }
+
+    /**
+     * @param string|null $bodInvalid
+     * @return GeneratedTestClassDto
+     */
+    public function setBodInvalid(?string $bodInvalid): GeneratedTestClassDto
+    {
+        $this->bodInvalid = $bodInvalid;
+        return $this;
+    }
 }
