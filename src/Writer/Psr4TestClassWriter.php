@@ -82,7 +82,7 @@ class Psr4TestClassWriter implements Psr4TestClassWriterInterface
     public function writeSchemaJson(GeneratedTestClassDto $generatedTestClass) : string
     {
         $writePath = $this->generatePsr4TestWritePath($generatedTestClass, self::TYPE_WRITE_JSON);
-dd($writePath);
+
         $writeDirectory = dirname($writePath);
 
         if (! $this->filesystem->exists($writeDirectory)) {
@@ -112,7 +112,7 @@ dd($writePath);
                     'Schema/',
                     implode('/',$testNamespace)
                 ) . '.json';
-            dd($writePath);
+
             $writePath = str_replace('\\', DIRECTORY_SEPARATOR, $writePath);
 
             return $writePath;
