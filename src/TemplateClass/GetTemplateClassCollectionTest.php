@@ -1,19 +1,20 @@
 <?php
 declare(strict_types=1);
 
-namespace PhpJit\ApidocTestsGeneratorTemplateClass;
+namespace PhpJit\ApidocTestsGenerator\TemplateClass;
 
 use ApiPlatform\Core\Bridge\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Core\Bridge\Symfony\Bundle\Test\Client;
 use ApiPlatform\Core\Bridge\Symfony\Routing\Router;
-use App\Tests\Libs\ClientTrait;
 use PhpJit\ApidocTestsGenerator\TptClassTestInterface;
+use PhpJit\ApidocTestsGenerator\Traits\ClientTrait;
 
-class GetTemplateClassCollectionTest extends ApiTestCase implements TptClassTestInterface {
+class GetTemplateClassCollectionTest extends ApiTestCase implements TptClassTestInterface
+{
+    use ClientTrait;
     private Client $client;
     private Router $router;
-
-    use ClientTrait;
+    private string $token;
 
     protected function setUp(): void
     {
@@ -37,6 +38,6 @@ class GetTemplateClassCollectionTest extends ApiTestCase implements TptClassTest
         self::assertResponseIsSuccessful();
         self::assertResponseHeaderSame('content-type', 'application/ld+json; charset=utf-8');
 
-        //self::assertMatchesResourceCollectionJsonSchema(Entity::class);
+        self::assertMatchesResourceCollectionJsonSchema(Entity::class);
     }
 }

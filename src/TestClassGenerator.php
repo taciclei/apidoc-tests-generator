@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PhpJit\ApidocTestsGenerator;
 
-use Api\Bundle\CoreBundle\Tests\Functionnal\Sale\GenerateAdminSaleTest;
 use ApiPlatform\Core\Metadata\Resource\Factory\ResourceNameCollectionFactoryInterface;
 use ApiPlatform\Core\OpenApi\Model\Components;
 use ApiPlatform\Core\OpenApi\Model\PathItem;
@@ -49,11 +48,18 @@ class TestClassGenerator implements TestClassGeneratorInterface
         $this->init($templateOperation['template'], $generatedTestClassDto, $tag);
             $codeResponse = Response::HTTP_OK;
             if ($generatedTestClassDto->getMethod() === 'post' || $generatedTestClassDto->getMethod() === 'put') {
-                $body = $this->requestBodyBuilder->getRequestBody($templateOperation['operation']);
+                $this->requestBodyBuilder->setResources($resource);
+                $request = $this->requestBodyBuilder->getRequestBody($templateOperation['operation']);
+                $body = $request->getBody();
+                $generatedTestClassDto->setBody(json_encode($body));
+                $bodyInvalid = $request->getBodyInvalid();
+                $generatedTestClassDto->setBodInvalid(json_encode($bodyInvalid));
+
                 $codeResponse = Response::HTTP_CREATED;
                 if ($body !== null) {
-                    $code = str_replace('{body}', json_encode($body), $generatedTestClassDto->getCode());
-                    $generatedTestClassDto->setCode($code);
+                    //$code = str_replace('{body}', json_encode($body), $generatedTestClassDto->getCode());
+                    //$code = str_replace('{body_invalid}', json_encode($bodyInvalid), $code);
+                    //$generatedTestClassDto->setCode($code);
                 }
 
             }elseif ($generatedTestClassDto->getMethod() === 'delete') {
@@ -65,7 +71,7 @@ class TestClassGenerator implements TestClassGeneratorInterface
                 $jsonSchema  = $this->responseBuilder->getJsonSchema($templateOperation['operation'], $codeResponse);
 
                 if($jsonSchema === null){
-                    $this->markSkippedBuilder->write($generatedTestClassDto, 'response:not jsonSchema or status code');
+                    //$this->markSkippedBuilder->write($generatedTestClassDto, 'response:not jsonSchema or status code');
                 }
                 $generatedTestClassDto->setClassName($class)
                     ->setjsonSchema($jsonSchema)

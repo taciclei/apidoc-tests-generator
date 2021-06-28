@@ -1,7 +1,7 @@
 <?php
 
 
-namespace PhpJit\ApidocTestsGeneratorTemplateClass;
+namespace PhpJit\ApidocTestsGenerator\TemplateClass;
 
 
 class Entity

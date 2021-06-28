@@ -1,28 +1,27 @@
 <?php
 declare(strict_types=1);
 
-namespace PhpJit\ApidocTestsGeneratorTemplateClass;
+namespace PhpJit\ApidocTestsGenerator\TemplateClass;
 
 use ApiPlatform\Core\Bridge\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Core\Bridge\Symfony\Bundle\Test\Client;
 use ApiPlatform\Core\Bridge\Symfony\Routing\Router;
-use App\Tests\Libs\ClientTrait;
-use App\Tests\Libs\RefreshDatabaseTrait;
 use PhpJit\ApidocTestsGenerator\TptClassTestInterface;
+use PhpJit\ApidocTestsGenerator\Traits\ClientTrait;
 use Symfony\Component\HttpFoundation\Response;
 
 class PutTemplateClassItemTest extends ApiTestCase implements TptClassTestInterface {
+    use ClientTrait;
     private Client $client;
     private Router $router;
-
-    use ClientTrait;
+    private string $token;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->token = self::getToken();
-
         $this->client = self::getClient($this->token);
+
         $router = static::$container->get('api_platform.router');
         if (!$router instanceof Router) {
             throw new \RuntimeException('api_platform.router service not found.');
@@ -33,7 +32,7 @@ class PutTemplateClassItemTest extends ApiTestCase implements TptClassTestInterf
      * depends testCreateTemplateClass
      * @group template_class
      */
-    public function testUpdateTemplateClass(): void
+    public function testReplaceTemplateClass(): void
     {
         $body = '{body}';
         $iri = (string) $this->findIriBy(Entity::class, []);
@@ -41,7 +40,7 @@ class PutTemplateClassItemTest extends ApiTestCase implements TptClassTestInterf
 
 
         self::assertResponseIsSuccessful();
-        self::assertJsonContains((array) json_decode($body));
+        //self::assertJsonContains((array) json_decode('{body}'));
     }
     /**
      * depends testCreateTemplateClass
@@ -49,21 +48,17 @@ class PutTemplateClassItemTest extends ApiTestCase implements TptClassTestInterf
      */
     public function testCreateInvalidTemplateClass(): void
     {
-        $this->markTestIncomplete('Failed asserting that the Response status code is 400');
-        $this->markTestSkipped('Failed asserting that the Response status code is 400');
 
         $iri = (string) $this->findIriBy(Entity::class, []);
-        $this->client->request('PUT', $iri, ['json' => [
-            'les_invalides' => 'invalid',
-        ]]);
-        self::assertResponseStatusCodeSame(Response::HTTP_OK);
-        //self::assertResponseStatusCodeSame(Response::HTTP_UNPROCESSABLE_ENTITY);
+        $body = '{body_invalid}';
+        $this->client->request('PUT', $iri, ['body' =>$body]);
+
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
         self::assertResponseHeaderSame('content-type', 'application/ld+json; charset=utf-8');
 
         self::assertJsonContains([
-            '@context' => '/contexts/ConstraintViolationList',
-            '@type' => 'ConstraintViolationList',
-            'hydra:title' => 'An error occurred'
+            '@context' => '/contexts/Error',
+            '@type' => 'hydra:Error'
         ]);
     }
 }

@@ -13,7 +13,7 @@ use function dirname;
 use function sprintf;
 use function str_replace;
 
-class Psr4TestClassWriter implements TestClassWriterInterface
+class Psr4TestClassWriter implements Psr4TestClassWriterInterface
 {
     /** @var Configuration */
     private $configuration;
@@ -33,6 +33,10 @@ class Psr4TestClassWriter implements TestClassWriterInterface
     {
         if(null !== $generatedTestClass->getJsonSchema()) {
             $this->writeSchemaJson($generatedTestClass);
+        }
+
+        if(null !== $generatedTestClass->getBody()) {
+            $this->writeBodyJson($generatedTestClass);
         }
 
         $writePath = $this->generatePsr4TestWritePath($generatedTestClass);
@@ -56,10 +60,29 @@ class Psr4TestClassWriter implements TestClassWriterInterface
         return $writePath;
     }
 
-    public function writeSchemaJson(GeneratedTestClassDto $generatedTestClass) : string
+
+    public function writeBodyJson(GeneratedTestClassDto $generatedTestClass) : string
     {
         $writePath = $this->generatePsr4TestWritePath($generatedTestClass, self::TYPE_WRITE_JSON);
 
+        $writeDirectory = dirname($writePath);
+
+        if (! $this->filesystem->exists($writeDirectory)) {
+            $this->filesystem->mkdir($writeDirectory, 0777);
+        }
+
+        $this->filesystem->dumpFile(
+            $writePath,
+            $generatedTestClass->getBody()
+        );
+
+        return $writePath;
+    }
+
+    public function writeSchemaJson(GeneratedTestClassDto $generatedTestClass) : string
+    {
+        $writePath = $this->generatePsr4TestWritePath($generatedTestClass, self::TYPE_WRITE_JSON);
+dd($writePath);
         $writeDirectory = dirname($writePath);
 
         if (! $this->filesystem->exists($writeDirectory)) {
@@ -73,6 +96,7 @@ class Psr4TestClassWriter implements TestClassWriterInterface
 
         return $writePath;
     }
+
     private function generatePsr4TestWritePath(GeneratedTestClassDto $generatedTestClass, $type = self::TYPE_WRITE_PHP) : string
     {
 
@@ -85,9 +109,10 @@ class Psr4TestClassWriter implements TestClassWriterInterface
         if($type === self::TYPE_WRITE_JSON) {
             $writePath .= '/' . str_replace(
                     $this->configuration->getTestsNamespace() . '\\',
-                    '',
+                    'Schema/',
                     implode('/',$testNamespace)
                 ) . '.json';
+            dd($writePath);
             $writePath = str_replace('\\', DIRECTORY_SEPARATOR, $writePath);
 
             return $writePath;
