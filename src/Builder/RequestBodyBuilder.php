@@ -79,12 +79,10 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
         $classes = $this->resourceNameCollection->create()->getIterator();
 
         foreach ($classes as $classe) {
-            echo $classe.PHP_EOL;
-            if(substr($classe,-1) == $className) {
+            if((substr($classe,-strlen($className)-1)) === '\\'.$className) {
                 return $classe;
             }
         }
-
         return null;
     }
 
@@ -239,10 +237,7 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
 
                         if ($value->offsetGet('format') == 'iri-reference') {
                             $index = (new CamelCaseToSnakeCaseNameConverter(null, false))->denormalize($index);
-                            dd($this->findIriBy($index, []));
-                            $this->findIriBy($index, []);
-                            dd($value);
-                            //return [$this->getIri($value)];
+                            return $this->findIriBy($index, [], ['id' => 'DESC']);
 
                         }
                         return $this->fakerGenerator->text(10, 20);
@@ -295,9 +290,10 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
     /**
      * Finds the IRI of a resource item matching the resource class and the specified criteria.
      */
-    protected function findIriBy(string $resourceClass, array $criteria): ?string
+    protected function findIriBy(string $resourceClass, array $criteria = [], ?array $orderBy = null, $limit = null, $offset = null): ?string
     {
         $resourceClass = $this->getEntityNamespace($resourceClass);
+
         if (null !== $resourceClass) {
             if (
                 (
@@ -309,10 +305,12 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
                     null === $objectManager = $this->container->get('doctrine_mongodb')->getManagerForClass($resourceClass)
                 )
             ) {
-                throw new \RuntimeException(sprintf('"%s" only supports classes managed by Doctrine ORM or Doctrine MongoDB ODM. Override this method to implement your own retrieval logic if you don\'t use those libraries.', __METHOD__));
+                return null;
+                //throw new \RuntimeException(sprintf('"%s" only supports classes managed by Doctrine ORM or Doctrine MongoDB ODM. Override this method to implement your own retrieval logic if you don\'t use those libraries. entity : "%s"', __METHOD__, $resourceClass));
             }
 
-            $item = $objectManager->getRepository($resourceClass)->findOneBy($criteria);
+            $item = $objectManager->getRepository($resourceClass)->findOneBy($criteria, $orderBy);
+
             if (null === $item) {
                 return null;
             }
