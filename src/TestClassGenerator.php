@@ -17,6 +17,7 @@ use ReflectionClass;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Serializer\NameConverter\CamelCaseToSnakeCaseNameConverter;
 use function str_replace;
+use ApiPlatform\Core\Serializer\JsonEncoder;
 
 class TestClassGenerator implements TestClassGeneratorInterface
 {
@@ -30,14 +31,16 @@ class TestClassGenerator implements TestClassGeneratorInterface
     private RequestBodyBuilderInterface $requestBodyBuilder;
     private ResponseBuilderInterface $responseBuilder;
     private MarkSkippedBuilderInterface $markSkippedBuilder;
+    private JsonEncoder $jsonEncoder;
 
-    public function __construct(ParserFactory $parserFactory, ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory, RequestBodyBuilderInterface $requestBodyBuilder, ResponseBuilderInterface $responseBuilder, MarkSkippedBuilderInterface $markSkippedBuilder)
+    public function __construct(ParserFactory $parserFactory, ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory, RequestBodyBuilderInterface $requestBodyBuilder, ResponseBuilderInterface $responseBuilder, MarkSkippedBuilderInterface $markSkippedBuilder, JsonEncoder $jsonEncoder)
     {
         $this->parserFactory = $parserFactory;
         $this->resourceNameCollectionFactory = $resourceNameCollectionFactory;
         $this->requestBodyBuilder = $requestBodyBuilder;
         $this->responseBuilder = $responseBuilder;
         $this->markSkippedBuilder = $markSkippedBuilder;
+        $this->jsonEncoder = $jsonEncoder;
     }
 
 
@@ -51,15 +54,15 @@ class TestClassGenerator implements TestClassGeneratorInterface
                 $this->requestBodyBuilder->setResources($resource);
                 $request = $this->requestBodyBuilder->getRequestBody($templateOperation['operation']);
                 $body = $request->getBody();
-                $generatedTestClassDto->setBody(json_encode($body));
+                $generatedTestClassDto->setBody($this->jsonEncoder->encode($body ,'json'));
                 $bodyInvalid = $request->getBodyInvalid();
-                $generatedTestClassDto->setBodInvalid(json_encode($bodyInvalid));
+                $generatedTestClassDto->setBodInvalid($this->jsonEncoder->encode($bodyInvalid,'json'));
 
                 $codeResponse = Response::HTTP_CREATED;
                 if ($body !== null) {
-                    //$code = str_replace('{body}', json_encode($body), $generatedTestClassDto->getCode());
-                    //$code = str_replace('{body_invalid}', json_encode($bodyInvalid), $code);
-                    //$generatedTestClassDto->setCode($code);
+                    $code = str_replace('{body}', $this->jsonEncoder->encode($body,'json'), $generatedTestClassDto->getCode());
+                    $code = str_replace('{body_invalid}', $this->jsonEncoder->encode($bodyInvalid,'json'), $code);
+                    $generatedTestClassDto->setCode($code);
                 }
 
             }elseif ($generatedTestClassDto->getMethod() === 'delete') {

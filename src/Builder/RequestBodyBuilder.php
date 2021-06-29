@@ -16,6 +16,7 @@ use Faker\Generator as FakerGenerator;
 use ApiPlatform\Core\Identifier\Normalizer\DateTimeIdentifierDenormalizer;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use ApiPlatform\Core\Hydra\Serializer\DocumentationNormalizer;
+use Symfony\Component\Serializer\NameConverter\CamelCaseToSnakeCaseNameConverter;
 
 
 class RequestBodyBuilder implements RequestBodyBuilderInterface
@@ -75,14 +76,16 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
 
     public function getEntityNamespace(string $className): ?string
     {
-            $classes = $this->resourceNameCollection->create()->getIterator();
-            foreach ($classes as $classe) {
-                if (str_contains($classe, $className)) {
-                    return $classe;
-                }
-            }
+        $classes = $this->resourceNameCollection->create()->getIterator();
 
-            return null;
+        foreach ($classes as $classe) {
+            echo $classe.PHP_EOL;
+            if(substr($classe,-1) == $className) {
+                return $classe;
+            }
+        }
+
+        return null;
     }
 
 
@@ -235,6 +238,10 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
                         }
 
                         if ($value->offsetGet('format') == 'iri-reference') {
+                            $index = (new CamelCaseToSnakeCaseNameConverter(null, false))->denormalize($index);
+                            dd($this->findIriBy($index, []));
+                            $this->findIriBy($index, []);
+                            dd($value);
                             //return [$this->getIri($value)];
 
                         }
@@ -254,7 +261,8 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
                     }
             }
         }
-        if ($value->offsetExists('$ref')) {;
+        if ($value->offsetExists('$ref')) {
+            ;
             return $this->getIri($value);
         }
     }
@@ -264,7 +272,7 @@ class RequestBodyBuilder implements RequestBodyBuilderInterface
         if ($value->offsetExists('$ref')) {
             $schema = explode('/', $value->offsetGet('$ref'));
             $entity = explode('.', end($schema));
-                return $this->findIriBy(current($entity), []);
+            return $this->findIriBy(current($entity), ['id' => 'DESC']);
         }
     }
 

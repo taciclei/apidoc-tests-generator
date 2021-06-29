@@ -5,6 +5,7 @@ use ApiPlatform\Core\Hydra\Serializer\DocumentationNormalizer;
 use ApiPlatform\Core\JsonLd\Action\ContextAction;
 use ApiPlatform\Core\JsonLd\Serializer\ItemNormalizer;
 use ApiPlatform\Core\Metadata\Extractor\ExtractorInterface;
+use ApiPlatform\Core\Serializer\JsonEncoder;
 use ApiPlatform\Core\Serializer\SerializerContextBuilderInterface;
 use PhpParser\ParserFactory;
 use ApiPlatform\Core\Identifier\Normalizer\DateTimeIdentifierDenormalizer;
@@ -22,6 +23,10 @@ return function(ContainerConfigurator $configurator) {
     ;
     $services->load('PhpJit\\ApidocTestsGenerator\\', '../../../src/*')
         ->exclude('../../../src/{DependencyInjection,Entity,Tests,Resources}');
+
+    $services->set(JsonEncoder::class)
+        ->arg('$format', 'json')
+        ->public();
 
     $services->set(ParserFactory::class)->autowire()->autoconfigure()->public();
     $services->set(DateTimeIdentifierDenormalizer::class)->autowire()->autoconfigure()->public();
