@@ -18,6 +18,7 @@ return function(ContainerConfigurator $configurator) {
         ->autowire()      // Automatically injects dependencies in your services.
         ->autoconfigure() // Automatically registers your services as commands, event subscribers, etc
         ->bind('$apidocTestsGeneratorConfigTemplates', '%apidoc_tests_generator.templates%')
+        ->bind('$apidocTestsGeneratorConfigWhiteList', '%apidoc_tests_generator.whiteList%')
         ->bind('$apidocTestsGeneratorConfigIgnoreRoutes', '%apidoc_tests_generator.ignoreRoutes%')
         ->bind('$apidocTestsGeneratorConfigMarkTestSkipped', '%apidoc_tests_generator.markTestSkipped%')
     ;

@@ -37,6 +37,7 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
     private array $apidocTestsGeneratorConfigTemplates;
     private array $apidocTestsGeneratorConfigMarkTestSkipped;
     private array $apidocTestsGeneratorConfigIgnoreRoutes;
+    private ?array $apidocTestsGeneratorConfigWhiteList = null;
 
     /**
      * @return OpenApiFactoryInterface
@@ -62,7 +63,8 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         ResourceNameCollectionFactoryInterface $resourceNameCollectionFactory,
         array $apidocTestsGeneratorConfigTemplates,
         array $apidocTestsGeneratorConfigMarkTestSkipped,
-        array $apidocTestsGeneratorConfigIgnoreRoutes
+        array $apidocTestsGeneratorConfigIgnoreRoutes,
+        ?array $apidocTestsGeneratorConfigWhiteList
     )
     {
         parent::__construct();
@@ -74,6 +76,7 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         $this->apidocTestsGeneratorConfigTemplates = $apidocTestsGeneratorConfigTemplates;
         $this->apidocTestsGeneratorConfigMarkTestSkipped = $apidocTestsGeneratorConfigMarkTestSkipped;
         $this->apidocTestsGeneratorConfigIgnoreRoutes = $apidocTestsGeneratorConfigIgnoreRoutes;
+        $this->apidocTestsGeneratorConfigWhiteList = $apidocTestsGeneratorConfigWhiteList;
     }
 
     protected function configure(): void
@@ -82,8 +85,24 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
             ->setDescription('Generate a PHPUnit test class from a apiDoc.');
     }
 
+
+    public function isWhiteList(string $route, string $method): bool
+    {
+
+        if(null === $this->apidocTestsGeneratorConfigWhiteList) {
+            return true;
+        }
+
+        foreach ($this->apidocTestsGeneratorConfigWhiteList as $whiteList) {
+            if($whiteList == ['route' => $route, 'method' => $method]) {
+                return true;
+            }
+        }
+        return false;
+    }
     public function isIgnoreRoutes(string $route, string $method): bool
     {
+
         foreach ($this->apidocTestsGeneratorConfigIgnoreRoutes as $ignoreRoutes) {
             if($ignoreRoutes == ['route' => $route, 'method' => $method]) {
                 return true;
@@ -101,6 +120,9 @@ class GenerateTestClassCommand extends Command implements GenerateTestClassComma
         foreach ($resources as $route => $resource) {
             $templatesOperation = $this->getTemplatesOperation($resource, $route);
             if($this->isIgnoreRoutes($route, '*')){
+                continue;
+            }
+            if(!$this->isWhiteList($route, '*')){
                 continue;
             }
             foreach ($templatesOperation as $templateOperation) {

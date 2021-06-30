@@ -26,9 +26,22 @@ class Configuration implements ConfigurationInterface
         $this->templatesNode($treeBuilder);
         $this->markTestSkippedNode($treeBuilder);
         $this->ignoreRoutesNode($treeBuilder);
+        $this->whiteListNode($treeBuilder);
         $treeBuilder->end();
 
         return $builder;
+    }
+
+    private function whiteListNode(NodeBuilder $treeBuilder) : void {
+        $treeBuilder
+            ->arrayNode('whiteList')
+            ->arrayPrototype()
+            ->children()
+            ->scalarNode('route')->end()
+            ->scalarNode('method')->end()
+            ->end()
+            ->end()
+        ;
     }
 
     private function ignoreRoutesNode(NodeBuilder $treeBuilder) : void {
