@@ -54,14 +54,14 @@ class TestClassGenerator implements TestClassGeneratorInterface
                 $this->requestBodyBuilder->setResources($resource);
                 $request = $this->requestBodyBuilder->getRequestBody($templateOperation['operation']);
                 $body = $request->getBody();
-                $generatedTestClassDto->setBody($this->jsonEncoder->encode($body ,'json'));
+                $generatedTestClassDto->setBody(json_encode($body ,JSON_PRETTY_PRINT+JSON_UNESCAPED_SLASHES));
                 $bodyInvalid = $request->getBodyInvalid();
-                $generatedTestClassDto->setBodInvalid($this->jsonEncoder->encode($bodyInvalid,'json'));
+                $generatedTestClassDto->setBodInvalid(json_encode($body ,JSON_PRETTY_PRINT+JSON_UNESCAPED_SLASHES));
 
                 $codeResponse = Response::HTTP_CREATED;
                 if ($body !== null) {
-                    $code = str_replace('{body}', $this->jsonEncoder->encode($body,'json'), $generatedTestClassDto->getCode());
-                    $code = str_replace('{body_invalid}', $this->jsonEncoder->encode($bodyInvalid,'json'), $code);
+                    $code = str_replace('{body}', json_encode($body ,JSON_PRETTY_PRINT+JSON_UNESCAPED_SLASHES), $generatedTestClassDto->getCode());
+                    $code = str_replace('{body_invalid}', json_encode($body ,JSON_PRETTY_PRINT+JSON_UNESCAPED_SLASHES), $code);
                     $generatedTestClassDto->setCode($code);
                 }
 
